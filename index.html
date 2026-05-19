@@ -2908,29 +2908,13 @@ function wazeInit() {
  * jamLevel: 0=fri, 1=lätt, 2=medel, 3=tung, 4=stillastående
  */
 async function fetchWazeRegion(regionId, url) {
-  const TIMEOUT_MS = 5000;
-
-  // Skicka direktanrop + alla proxys parallellt – ta den som svarar först
-  const race = [
-    () => fetch(url),
-    ...WAZE_PROXIES.map(proxy => () => fetch(proxy(url))),
-  ].map(fn => {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
-    return fn({ signal: ac.signal })
-      .then(res => {
-        clearTimeout(timer);
-        if (!res.ok) throw new Error(res.status);
-        return res.json();
-      })
-      .catch(err => { clearTimeout(timer); throw err; });
-  });
-
   let data = null;
   try {
-    data = await Promise.any(race);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    data = await res.json();
   } catch {
-    console.warn(`Waze: alla försök misslyckades för ${regionId}`);
+    console.warn(`Waze: anrop misslyckades för ${regionId}`);
     return null;
   }
 
