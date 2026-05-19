@@ -1323,10 +1323,10 @@ const CONFIG = {
   regioner: [
     { id:'norra',     namn:'Norra',     harWaze:false, harKoll:false, harMCS:false },
     { id:'mellersta', namn:'Mellersta', harWaze:false, harKoll:false, harMCS:false },
-    { id:'ostra',     namn:'Östra',     harWaze:true,  wazeUrl:'https://www.waze.com/row-partnerhub-api/feeds-tvt/?id=1634121339223', harKoll:true,  harMCS:true  },
-    { id:'vastra',    namn:'Västra',    harWaze:true,  wazeUrl:'https://www.waze.com/row-partnerhub-api/feeds-tvt/?id=1746521567138', harKoll:false, harMCS:true  },
+    { id:'ostra',     namn:'Östra',     harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/ostra', harKoll:true,  harMCS:true  },
+    { id:'vastra',    namn:'Västra',    harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/vastra', harKoll:false, harMCS:true  },
     { id:'sydostra',  namn:'Sydöstra',  harWaze:false, harKoll:false, harMCS:false },
-    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:'https://www.waze.com/row-partnerhub-api/feeds-tvt/?id=1746521670227', harKoll:false, harMCS:false },
+    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/sodra', harKoll:false, harMCS:false },
   ]
 };
 
@@ -2472,7 +2472,7 @@ async function ktLoadAll() {
    flikbesök. Uppdateras automatiskt var 2:e minut.
    ═══════════════════════════════════════════════════════════════ */
 
-const API_URL  = 'https://api.trafikinfo.trafikverket.se/v2/data.json';
+const API_URL  = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket';
 const AUTH_KEY = API_KEYS.trafikverket;
 
 const MS_PER_HOUR = 3_600_000;
@@ -2890,11 +2890,7 @@ setInterval(()=>{
    publika CORS-proxies. Uppdateras var 5:e minut.
    ═══════════════════════════════════════════════════════════════ */
 
-const WAZE_PROXIES = [
-  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-  u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-  u => 'https://proxy.cors.sh/' + u,
-];
+// Waze hämtas via proxy
 
 let wazeInitialized = false;
 
@@ -4489,7 +4485,7 @@ function renderMCSGauges() {
    Lazy-initieras när TomTom-fliken öppnas första gången.
    ═══════════════════════════════════════════════════════════════ */
 
-const TT_BASE_URL = 'https://api.tomtom.com/routemonitoring/3';
+const TT_BASE_URL = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/tomtom';
 
 const ttState = {
   routes:           [],
@@ -5036,7 +5032,7 @@ function ttToggleDetails(routeId) {
 // ── fetchTrafikverket för TomTom — använder CO_XML från tldb2 ─────
 async function ttFetchTrafikverket() {
   try {
-    const res = await fetch('https://api.trafikinfo.trafikverket.se/v2/data.json', {
+    const res = await fetch('https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket', {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML
     });
     if (!res.ok) return;
@@ -5066,7 +5062,7 @@ async function ttFetchTrafikverket() {
 // ── Hämta vägarbeten (ManagedCause=true, SeverityCode>2) ────────────
 async function ttFetchVagarbeten() {
   try {
-    const res = await fetch('https://api.trafikinfo.trafikverket.se/v2/data.json', {
+    const res = await fetch('https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket', {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML_VAGARBETE
     });
     if (!res.ok) return;
@@ -5100,7 +5096,7 @@ async function ttFetchDetails(routeId) {
   const key = API_KEYS.tomtom;
   if (!key) return;
   try {
-    const res = await fetch(`${TT_BASE_URL}/routes/${routeId}/details?key=${key}`);
+    const res = await fetch(`${TT_BASE_URL}/routes/${routeId}/details`);
     if (!res.ok) return;
     const data = await res.json();
     const segs = data.detailedSegments || [];
@@ -5126,7 +5122,7 @@ async function ttLoadRoutes() {
   ttState.segmentsCache.clear();
   ttSegBarState.clear();
   try {
-    const res = await fetch(`${TT_BASE_URL}/routes?key=${key}`);
+    const res = await fetch(`${TT_BASE_URL}/routes`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     ttState.routes = Array.isArray(data) ? data : (data.routes || []);
