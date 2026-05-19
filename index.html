@@ -2134,15 +2134,50 @@ async function fetchRoadCondition() {
    ═══════════════════════════════════════════════════════════════ */
 
 const speedHistory = { vastra:[], ostra:[] };
-const speedHistoryStart = { vastra:null, ostra:null }; // Tidpunkt för första mätning
-const SPEED_HIST_MAX = 30 * 60_000;   // Behåll 30 min historik
+const speedHistoryStart = { vastra:null, ostra:null };
+const SPEED_HIST_MAX = 30 * 60_000;
+const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev';
 let _flowAbort = null;
 let flowInitialized = false;
+
+// Ladda historik från KV vid start – fyller speedHistory med sparade punkter
+async function loadSpeedHistory() {
+  try {
+    const res = await fetch(`${PROXY_BASE}/history`);
+    if (!res.ok) return;
+    const saved = await res.json();
+    const now = Date.now();
+    const cutoff = now - SPEED_HIST_MAX;
+    for (const key of ['vastra', 'ostra']) {
+      if (!Array.isArray(saved[key])) continue;
+      // Filtrera bort punkter äldre än 30 min
+      speedHistory[key] = saved[key].filter(p => p.ts > cutoff);
+      if (speedHistory[key].length) {
+        speedHistoryStart[key] = speedHistory[key][0].ts;
+      }
+    }
+    // Rita direkt om data finns
+    if (document.getElementById('tab-mcs')?.classList.contains('active')) renderMCSGauges();
+    buildAll();
+  } catch (e) {
+    console.warn('Kunde inte ladda speedHistory:', e);
+  }
+}
+
+// Spara historik till KV efter varje fetch – fire-and-forget
+function saveSpeedHistory() {
+  const payload = JSON.stringify(speedHistory);
+  fetch(`${PROXY_BASE}/history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+  }).catch(() => {});
+}
 
 function flowInit() {
   if (!flowInitialized) {
     flowInitialized = true;
-    fetchFlowAll();
+    loadSpeedHistory().then(() => fetchFlowAll());
     setInterval(fetchFlowAll, CONFIG.interval.trafikflode);
   }
 }
@@ -2233,6 +2268,7 @@ async function fetchFlowAll() {
       LIVEDATA[key].mcsTrend = t15;
     });
 
+    saveSpeedHistory();
     if (document.getElementById('tab-oversikt')?.classList.contains('active')) buildAll();
     omrUpdate();
     if (document.getElementById('tab-mcs')?.classList.contains('active')) renderMCSGauges();
