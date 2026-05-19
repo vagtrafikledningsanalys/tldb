@@ -896,6 +896,91 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .group-sep:first-child{border-top:none;margin-top:0;}
 .cell{display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .lbl{color:#aaa;text-align:center;line-height:1.2;text-transform:uppercase;letter-spacing:0.03em;overflow:hidden;}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIV – Surfplatta (≤900px)
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+
+  /* Topbar: dölj titeln, spar plats åt flikar */
+  .topbar-title { display: none; }
+  .topbar-logo  { margin-right: 8px; }
+  .topbar       { padding: 0 8px; }
+
+  /* Flikar: mindre padding + dölj sällan-använda */
+  .tab { padding: 0 10px; font-size: 10px; }
+  .tab[data-tab="mcs"],
+  .tab[data-tab="tomtom"],
+  .tab[data-tab="forklaring"],
+  .tab[data-tab="kollektivtrafik"],
+  .tab[data-tab="vader"] { display: none; }
+
+  /* Översikt: 2 kolumner istället för 3 */
+  .dashboard {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto;
+  }
+
+  /* Område: KPI-strip ovanför, detaljer under */
+  .omr-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .omr-kpi-strip {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #1a1a1a;
+    grid-template-columns: repeat(4, 1fr);
+    overflow-y: visible;
+  }
+  .omr-detail-area {
+    overflow: visible;
+    min-height: 0;
+  }
+
+  /* TomTom-barer: döljs */
+  .omr-tt-wrap { display: none; }
+
+  /* MCS-badge: döljs (tar för mycket plats) */
+  .omr-mcs-badge { display: none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIV – Telefon (≤480px)
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+  /* Topbar */
+  .topbar { height: 38px; }
+  .tab    { padding: 0 8px; font-size: 9px; }
+
+  /* Översikt: 2 kolumner, kompaktare gap */
+  .dashboard { gap: 4px; padding: 4px; }
+
+  /* Område toolbar: dölj labels, bara pills */
+  .omr-filter-label  { display: none; }
+  .omr-filter-divider { display: none; }
+  .omr-toolbar       { gap: 6px; padding: 6px 10px; }
+
+  /* KPI-strip: 3 kolumner på telefon */
+  .omr-kpi-strip {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 6px;
+  }
+  .omr-kpi-lbl { font-size: 9px; }
+
+  /* Topp5-tabell: horisontell scroll */
+  .omr-top5-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .omr-top5-table  { min-width: 480px; }
+  .omr-top5-wrap   { max-height: none; }
+
+  /* Detaljyta: ingen padding */
+  .omr-detail-area { padding: 8px 10px; }
+
+  /* KPI-header: kompaktare */
+  .omr-kpi-header { padding: 8px 10px 4px; }
+  .omr-kpi-title  { font-size: 13px; }
+}
 </style>
 </head>
 <body>
