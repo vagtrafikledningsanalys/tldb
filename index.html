@@ -133,12 +133,11 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   padding:10px;
   gap:4px;
   flex-shrink:0;
-  width:auto;
-  min-width:220px;
-  max-width:320px;
+  width:290px;
   overflow-y:auto;
   overflow-x:hidden;
   border-right:1px solid #1a1a1a;
+  box-sizing:border-box;
 }
 .omr-kpi-cell{
   display:flex;flex-direction:column;align-items:center;
@@ -3480,13 +3479,14 @@ function buildOmrKpiStrip(cfg, data) {
   let cols, sz;
   if (vw >= 900) {
     cols = 2;
-    sz = Math.floor(Math.max(44, (stripW - 20 - 4) / 2));
-    // Sätt explicit bredd så stripen inte svämmar över
-    strip.style.width = (sz * 2 + 20 + 4) + 'px';
+    // Fast stripbredd 290px, padding 10px var sida = 270px tillgängligt, gap 4px
+    sz = Math.floor((290 - 20 - 4) / 2); // = 133px
+    strip.style.width = '290px';
   } else {
     strip.style.width = '';
     cols = vw < 480 ? 3 : 4;
-    sz   = Math.floor(Math.max(44, (stripW - 20 - (cols - 1) * 4) / cols));
+    const availW = stripW || (vw - 0);
+    sz = Math.floor(Math.max(44, (availW - 20 - (cols - 1) * 4) / cols));
   }
 
   strip.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
