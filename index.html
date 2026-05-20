@@ -23,7 +23,8 @@ html,body{height:100%;width:100%;background:#0a0a0a;font-family:system-ui,sans-s
   letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;
 }
 /* ── Flikar ── */
-.tabs{display:flex;align-items:flex-end;gap:2px;height:100%;}
+.tabs{display:flex;align-items:flex-end;gap:2px;height:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
 .tab{
   display:flex;align-items:center;padding:0 16px;height:34px;
   font-size:11px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;
@@ -44,10 +45,8 @@ html,body{height:100%;width:100%;background:#0a0a0a;font-family:system-ui,sans-s
 .dashboard{
   padding:8px;
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  grid-template-rows:repeat(2,1fr);
   gap:8px;
-  width:100%;flex:1;min-height:0;
+  width:100%;flex:1;min-height:0;overflow-y:auto;
 }
 /* ── Område platshållare ── */
 .omrade-placeholder{
@@ -92,13 +91,15 @@ body.hide-tbd .lbl-tbd { color:transparent; }
 body.hide-tbd .omr-kpi-strip .tbd-cell { display:none; }
 body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .omr-toolbar{
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  display:flex;align-items:center;gap:12px;flex-wrap:nowrap;
   padding:8px 14px;border-bottom:1px solid #1e1e1e;flex-shrink:0;
-  background:#0e0e0e;
+  background:#0e0e0e;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
 }
-.omr-filter-group{display:flex;align-items:center;gap:8px;}
+.omr-toolbar::-webkit-scrollbar{display:none;}
+.omr-filter-group{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .omr-filter-label{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:#ccc;white-space:nowrap;}
-.omr-pills{display:flex;gap:4px;flex-wrap:wrap;}
+.omr-pills{display:flex;gap:4px;flex-wrap:nowrap;}
 .omr-pill{
   background:#1a1a1a;border:1px solid #2a2a2a;color:#ccc;
   padding:3px 10px;border-radius:20px;font-size:10px;font-family:system-ui,sans-serif;
@@ -471,23 +472,14 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 
 /* ══ STÖRNINGAR ══ */
 .tp-toolbar{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  display:flex;align-items:center;gap:8px;flex-wrap:nowrap;
   padding:8px 12px;border-bottom:1px solid #1e1e1e;flex-shrink:0;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
 }
-.tp-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;}
-.tp-search{
-  background:#1a1a1a;border:1px solid #2a2a2a;color:#ccc;
-  padding:4px 8px;border-radius:5px;font-size:10px;font-family:system-ui,sans-serif;
-  width:200px;outline:none;
-}
-.tp-search:focus{border-color:#009FE3;}
-.tp-sel{
-  background:#1a1a1a;border:1px solid #2a2a2a;color:#eee;
-  padding:3px 6px;border-radius:5px;font-size:10px;font-family:system-ui,sans-serif;
-  outline:none;cursor:pointer;
-}
-.tp-sel:focus,.tp-sel.active{border-color:#009FE3;color:#ccc;}
+.tp-toolbar::-webkit-scrollbar{display:none;}
+.tp-filters{display:flex;gap:4px;align-items:center;flex-wrap:nowrap;flex-shrink:0;}
 .tp-row-count{font-size:10px;color:#ccc;white-space:nowrap;}
+.tp-pill-sep{width:1px;height:16px;background:#333;flex-shrink:0;margin:0 4px;}
 .tp-table-wrap{flex:1;overflow:auto;padding:0 12px 12px;}
 .tp-table{
   width:100%;border-collapse:collapse;font-size:11px;
@@ -907,21 +899,22 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   .topbar-logo  { margin-right: 8px; }
   .topbar       { padding: 0 8px; }
 
+  /* Tillåt scroll på smal skärm */
+  html, body     { overflow: auto; height: auto; }
+  .appshell      { height: auto; min-height: 100vh; }
+  .tab-content   { min-height: 0; overflow: visible; flex: none; }
+  .dashboard     { overflow: visible; }
+  .rc            { overflow: visible; }
+
   /* Flikar: mindre padding + dölj sällan-använda */
   .tab { padding: 0 10px; font-size: 10px; }
   .tab[data-tab="mcs"],
   .tab[data-tab="tomtom"],
-  .tab[data-tab="forklaring"],
   .tab[data-tab="kollektivtrafik"],
   .tab[data-tab="vader"],
-  .tab[data-tab="storningar"],
   .tab[data-tab="vadervarningar"] { display: none; }
 
-  /* Översikt: 2 kolumner istället för 3 */
-  .dashboard {
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: auto;
-  }
+  /* Översikt: JS hanterar kolumnantal dynamiskt */
 
   /* Område: KPI-strip ovanför, detaljer under */
   .omr-body {
@@ -997,7 +990,7 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
     <div class="tabs">
       <div class="tab active" data-tab="oversikt">Översikt</div>
       <div class="tab" data-tab="omrade">Område</div>
-      <div class="tab" data-tab="storningar">Alla störningar</div>
+      <div class="tab" data-tab="storningar">Störningslista</div>
       <div class="tab" data-tab="mcs">MCS</div>
       <div class="tab" data-tab="tomtom">TomTom</div>
       <div class="tab" data-tab="kollektivtrafik">Kollektivtrafik</div>
@@ -1118,12 +1111,46 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   </div>
   <div class="tab-content" id="tab-storningar">
     <div class="tp-toolbar">
-      <div class="tp-filters">
-        <input type="text" class="tp-search" id="tp-searchInput" placeholder="Sök väg / plats / meddelande…" oninput="renderTPTable()"/>
-        <select class="tp-sel" id="tp-f_road"    onchange="renderTPTable()"><option value="">Alla vägar</option></select>
-        <select class="tp-sel" id="tp-f_msgcode" onchange="renderTPTable()"><option value="">Alla händelsetyper</option></select>
-        <select class="tp-sel" id="tp-f_county"  onchange="renderTPTable()"><option value="">Alla län</option></select>
-        <select class="tp-sel" id="tp-f_tc"      onchange="renderTPTable()"><option value="">Alla TC</option></select>
+      <div class="tp-filters" id="tp-county-pills">
+        <!-- Alla -->
+        <button class="omr-pill active" data-group="all" onclick="tpPillClick(this)">Alla</button>
+        <span class="tp-pill-sep"></span>
+        <!-- Regioner -->
+        <button class="omr-pill" data-group="region" data-val="norra"     onclick="tpPillClick(this)">Norra</button>
+        <button class="omr-pill" data-group="region" data-val="mellersta" onclick="tpPillClick(this)">Mellersta</button>
+        <button class="omr-pill" data-group="region" data-val="ostra"     onclick="tpPillClick(this)">Östra</button>
+        <button class="omr-pill" data-group="region" data-val="vastra"    onclick="tpPillClick(this)">Västra</button>
+        <button class="omr-pill" data-group="region" data-val="sydostra"  onclick="tpPillClick(this)">Sydöstra</button>
+        <button class="omr-pill" data-group="region" data-val="sodra"     onclick="tpPillClick(this)">Södra</button>
+        <span class="tp-pill-sep"></span>
+        <!-- TC -->
+        <button class="omr-pill" data-group="tc" data-val="TC Öst"  onclick="tpPillClick(this)">TC Öst</button>
+        <button class="omr-pill" data-group="tc" data-val="TC Syd"  onclick="tpPillClick(this)">TC Syd</button>
+        <button class="omr-pill" data-group="tc" data-val="TC Väst" onclick="tpPillClick(this)">TC Väst</button>
+        <button class="omr-pill" data-group="tc" data-val="TC Nord" onclick="tpPillClick(this)">TC Nord</button>
+        <span class="tp-pill-sep"></span>
+        <!-- Län i nummerordning -->
+        <button class="omr-pill" data-group="county" data-val="1"  onclick="tpPillClick(this)">Stockholm</button>
+        <button class="omr-pill" data-group="county" data-val="3"  onclick="tpPillClick(this)">Uppsala</button>
+        <button class="omr-pill" data-group="county" data-val="4"  onclick="tpPillClick(this)">Södermanland</button>
+        <button class="omr-pill" data-group="county" data-val="5"  onclick="tpPillClick(this)">Östergötland</button>
+        <button class="omr-pill" data-group="county" data-val="6"  onclick="tpPillClick(this)">Jönköping</button>
+        <button class="omr-pill" data-group="county" data-val="7"  onclick="tpPillClick(this)">Kronoberg</button>
+        <button class="omr-pill" data-group="county" data-val="8"  onclick="tpPillClick(this)">Kalmar</button>
+        <button class="omr-pill" data-group="county" data-val="9"  onclick="tpPillClick(this)">Gotland</button>
+        <button class="omr-pill" data-group="county" data-val="10" onclick="tpPillClick(this)">Blekinge</button>
+        <button class="omr-pill" data-group="county" data-val="12" onclick="tpPillClick(this)">Skåne</button>
+        <button class="omr-pill" data-group="county" data-val="13" onclick="tpPillClick(this)">Halland</button>
+        <button class="omr-pill" data-group="county" data-val="14" onclick="tpPillClick(this)">Västra Götaland</button>
+        <button class="omr-pill" data-group="county" data-val="17" onclick="tpPillClick(this)">Värmland</button>
+        <button class="omr-pill" data-group="county" data-val="18" onclick="tpPillClick(this)">Örebro</button>
+        <button class="omr-pill" data-group="county" data-val="19" onclick="tpPillClick(this)">Västmanland</button>
+        <button class="omr-pill" data-group="county" data-val="20" onclick="tpPillClick(this)">Dalarna</button>
+        <button class="omr-pill" data-group="county" data-val="21" onclick="tpPillClick(this)">Gävleborg</button>
+        <button class="omr-pill" data-group="county" data-val="22" onclick="tpPillClick(this)">Västernorrland</button>
+        <button class="omr-pill" data-group="county" data-val="23" onclick="tpPillClick(this)">Jämtland</button>
+        <button class="omr-pill" data-group="county" data-val="24" onclick="tpPillClick(this)">Västerbotten</button>
+        <button class="omr-pill" data-group="county" data-val="25" onclick="tpPillClick(this)">Norrbotten</button>
       </div>
       <span class="tp-row-count" id="tp-rowCount"></span>
       <button class="smhi-refresh-btn" id="tp-refreshBtn" onclick="fetchTPData()">
@@ -2352,11 +2379,24 @@ function buildAll() {
   const dw = dash.getBoundingClientRect().width  || window.innerWidth;
   const dh = dash.getBoundingClientRect().height || window.innerHeight;
 
-  const cardW = (dw - 8*2 - 8*2) / 3;
-  const cardH = (dh - 8*2 - 8*2) / 2;
+  // Välj antal kolumner baserat på tillgänglig bredd
+  const nRegions = CONFIG.regioner.length; // 6
+  const cols = dw < 480 ? 1 : dw < 800 ? 2 : 3;
+  const rows = Math.ceil(nRegions / cols);
+
+  // På smal skärm: auto-höjd så innehållet inte klipps — användaren scrollar
+  const rowTemplate = cols < 3 ? 'auto' : `repeat(${rows}, 1fr)`;
+  dash.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  dash.style.gridTemplateRows    = rowTemplate;
+
+  const cardW = (dw - 8*2 - 8*(cols-1)) / cols;
+  // På smal skärm: ge korten en rimlig minhöjd istället för att dela viewporten
+  const cardH = cols < 3
+    ? Math.max(260, dh * 0.45)
+    : (dh - 8*2 - 8*(rows-1)) / rows;
 
   const hdrH    = 28;
-  const nCols   = 4;
+  const nCols   = cols === 1 ? 6 : 4;  // 1 kolonn → visa alla 6 KPI:er på en rad
   const sepH    = 16;
   const padding = 16;
   const availH  = cardH - hdrH - sepH * 3 - padding;
@@ -2368,7 +2408,6 @@ function buildAll() {
   const cellGap = Math.max(2,  Math.floor(sz * 0.06));
 
   CONFIG.regioner.forEach(regionCfg => {
-    // Slå ihop testdata med livedata – live vinner på de fält som finns
     const data = Object.assign({}, DEFAULT_DATA[regionCfg.id] || {}, LIVEDATA[regionCfg.id] || {});
     buildCard(dash, regionCfg, data, sz, titleFs, lblFs, cellGap);
   });
@@ -2589,7 +2628,7 @@ async function ktLoadAll() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STÖRNINGAR — Alla störningar-fliken
+   STÖRNINGAR — Störningslista-fliken
    Hämtar Trafikverkets Situation-objekt, berikar med ÅDT/körfält
    och renderar sökbar/sorterbar tabell. Lazy-initierad vid första
    flikbesök. Uppdateras automatiskt var 2:e minut.
@@ -2862,33 +2901,57 @@ async function fetchTPData(){
   }
 }
 
-/* ── Filter & render ── */
-function populateTPFilters(){
-  const roads=[...new Set(tpData.map(d=>d.dev.RoadNumber).filter(Boolean))].sort();
-  const codes=[...new Set(tpData.map(d=>d.dev.MessageCode).filter(Boolean))].sort();
-  const counties=[...new Set(tpData.flatMap(d=>toCountyNos(d.dev.CountyNo).map(n=>COUNTY[n]||`Län ${n}`)))].filter(Boolean).sort();
-  const tcs=[...new Set(tpData.map(d=>getTC(d.dev.CountyNo)).filter(Boolean))].sort();
-  const fill=(id,vals)=>{
-    const el=document.getElementById(id); if(!el)return;
-    const cur=el.value;
-    el.innerHTML='<option value="">Alla</option>'+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
-    el.classList.toggle('active',!!el.value);
-  };
-  fill('tp-f_road',roads); fill('tp-f_msgcode',codes);
-  fill('tp-f_county',counties); fill('tp-f_tc',tcs);
+/* ── Pill-filter för störningar ── */
+let tpActiveGroup = 'all';   // 'all' | 'region' | 'tc' | 'county'
+let tpActiveVals  = new Set();
+
+function tpPillClick(el) {
+  const group = el.dataset.group;
+  const val   = el.dataset.val;
+
+  if (group === 'all') {
+    // Återställ allt
+    tpActiveGroup = 'all';
+    tpActiveVals.clear();
+    document.querySelectorAll('#tp-county-pills .omr-pill').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    // Om man byter grupp — rensa föregående grupp
+    if (tpActiveGroup !== group) {
+      tpActiveVals.clear();
+      document.querySelectorAll('#tp-county-pills .omr-pill').forEach(b => b.classList.remove('active'));
+      tpActiveGroup = group;
+    }
+    // Toggle denna pill
+    if (tpActiveVals.has(val)) {
+      tpActiveVals.delete(val);
+      el.classList.remove('active');
+    } else {
+      tpActiveVals.add(val);
+      el.classList.add('active');
+    }
+    // Om inget är valt → tillbaka till Alla
+    if (tpActiveVals.size === 0) {
+      tpActiveGroup = 'all';
+      document.querySelector('#tp-county-pills .omr-pill[data-group="all"]').classList.add('active');
+    }
+  }
+  renderTPTable();
 }
 
 function renderTPTable(){
-  populateTPFilters();
-  const search=(document.getElementById('tp-searchInput')?.value||'').toLowerCase();
-  const fRoad=document.getElementById('tp-f_road')?.value||'';
-  const fCode=document.getElementById('tp-f_msgcode')?.value||'';
-  const fCounty=document.getElementById('tp-f_county')?.value||'';
-  const fTC=document.getElementById('tp-f_tc')?.value||'';
-
-  let rows=tpData.filter(({dev})=>{
-    const ms=!search||(dev.RoadNumber||'').toLowerCase().includes(search)||(dev.LocationDescriptor||'').toLowerCase().includes(search)||(dev.Message||'').toLowerCase().includes(search);
-    return ms&&(!fRoad||(dev.RoadNumber||'')===fRoad)&&(!fCode||(dev.MessageCode||'')===fCode)&&(!fCounty||toCountyNos(dev.CountyNo).map(n=>COUNTY[n]||`Län ${n}`).includes(fCounty))&&(!fTC||getTC(dev.CountyNo)===fTC);
+  let rows = tpData.filter(({dev}) => {
+    if (tpActiveGroup === 'all' || tpActiveVals.size === 0) return true;
+    if (tpActiveGroup === 'county') {
+      return toCountyNos(dev.CountyNo).map(String).some(n => tpActiveVals.has(n));
+    }
+    if (tpActiveGroup === 'tc') {
+      return tpActiveVals.has(getTC(dev.CountyNo));
+    }
+    if (tpActiveGroup === 'region') {
+      return toCountyNos(dev.CountyNo).some(n => tpActiveVals.has(COUNTY_AREA[n]));
+    }
+    return true;
   });
 
   const sevOrder={stor:0,medel:1,liten:2};
