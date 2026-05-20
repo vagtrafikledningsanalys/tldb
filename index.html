@@ -923,10 +923,10 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   }
   .omr-kpi-strip {
     width: 100%;
-    height: 45vh;
+    height: auto;
     border-right: none;
     border-bottom: 1px solid #1a1a1a;
-    overflow: hidden;
+    overflow: visible;
   }
   .omr-detail-area {
     overflow: visible;
@@ -3480,18 +3480,10 @@ function buildOmrKpiStrip(cfg, data) {
     cols = 2;
     sz = Math.floor(Math.max(44, (stripW - 20 - 4) / 2));
   } else {
-    // Mobil: hitta cols/rows-kombination som fyller både bredd och höjd
-    // Prova cols 2..nInds, välj den där sz är störst men alla rader ryms
-    let bestCols = 2, bestSz = 0;
-    for (let c = 2; c <= nInds; c++) {
-      const rows = Math.ceil(nInds / c);
-      const szW  = Math.floor((stripW - 20 - (c - 1) * 4) / c);
-      const szH  = Math.floor((stripH - 20 - (rows - 1) * 4) / rows);
-      const s    = Math.min(szW, szH);
-      if (s >= 40 && s > bestSz) { bestSz = s; bestCols = c; }
-    }
-    cols = bestCols;
-    sz   = bestSz || 44;
+    // Mobil: välj cols baserat på bredd, sz baserat på bredd
+    // 3 kolumner på smal skärm, 4 på bredare
+    cols = vw < 480 ? 3 : 4;
+    sz   = Math.floor(Math.max(44, (stripW - 20 - (cols - 1) * 4) / cols));
   }
 
   strip.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
