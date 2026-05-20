@@ -916,28 +916,27 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 
   /* Översikt: JS hanterar kolumnantal dynamiskt */
 
-  /* Område: KPI-strip ovanför, detaljer under */
+  /* Område: stapla vertikalt */
   .omr-body {
     flex-direction: column;
-    overflow-y: auto;
+    overflow: visible;
   }
   .omr-kpi-strip {
     width: 100%;
+    height: 45vh;
     border-right: none;
     border-bottom: 1px solid #1a1a1a;
-    grid-template-columns: repeat(4, 1fr);
-    overflow-y: visible;
+    overflow: hidden;
   }
   .omr-detail-area {
     overflow: visible;
     min-height: 0;
+    padding: 10px 12px;
   }
+  /* Dölj topp5 och TomTom-rutter på smal skärm */
+  .omr-top5-wrap { display: none; }
+  .omr-tt-wrap   { display: none; }
 
-  /* TomTom-barer: döljs */
-  .omr-tt-wrap { display: none; }
-
-  /* MCS-badge: döljs (tar för mycket plats) */
-  .omr-mcs-badge { display: none !important; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -998,7 +997,7 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
       <div class="tab" data-tab="forklaring">Förklaring</div>
       <div class="tbd-toggle-wrap">
         <span class="tbd-toggle-lbl">Dölj TBD</span>
-        <button class="tbd-toggle" id="tbd-toggle" onclick="toggleTBD(this)" aria-pressed="false">
+        <button class="tbd-toggle" id="tbd-toggle" onclick="toggleTBD(this)" aria-pressed="true">
           <span class="tbd-toggle-knob"></span>
         </button>
       </div>
@@ -1054,10 +1053,6 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
           <div class="tv-bar"></div>
           <span class="omr-kpi-title" id="omr-kpi-title">—</span>
           <span class="omr-kpi-subtitle" id="omr-kpi-subtitle"></span>
-        </div>
-        <div id="omr-mcs-badge" class="omr-mcs-badge" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-          MCS-data tillgänglig för detta område
         </div>
       </div>
 
@@ -3456,15 +3451,11 @@ function omrRender() {
   }
   document.getElementById('omr-kpi-subtitle').textContent = counties.join(' · ');
 
-  // MCS-badge
-  const hasMCS = type === 'region' ? MCS_REGIONS.has(id) : MCS_TCS.has(id);
-  document.getElementById('omr-mcs-badge').style.display = hasMCS ? 'flex' : 'none';
-
   // Berika data med vägarbeten (räknas direkt med TC_MAP/COUNTY_AREA)
   data.vagarbeten = countVagarbeten(type, id);
 
-  // Bygg KPI-remsan
-  buildOmrKpiStrip(cfg, data);
+  // Bygg KPI-remsan — rAF säkerställer att strip har korrekt bredd
+  requestAnimationFrame(() => buildOmrKpiStrip(cfg, data));
 
   // Bygg topp-5 lista
   buildOmrTop5(type, id);
@@ -3475,8 +3466,36 @@ function omrRender() {
 
 function buildOmrKpiStrip(cfg, data) {
   const strip = document.getElementById('omr-kpi-strip');
-  const sz = 116;
-  const lblFs = 11;
+
+  const allInds = buildIndicatorList(cfg, data).filter(ind => ind.sep === undefined);
+  const nInds = allInds.length;
+
+  const vw = window.innerWidth;
+  const stripW = strip.getBoundingClientRect().width || strip.offsetWidth || 290;
+  const stripH = strip.getBoundingClientRect().height || strip.offsetHeight || 400;
+
+  let cols, sz;
+  if (vw >= 900) {
+    // Desktop: 2 kolumner vertikal strip
+    cols = 2;
+    sz = Math.floor(Math.max(44, (stripW - 20 - 4) / 2));
+  } else {
+    // Mobil: hitta cols/rows-kombination som fyller både bredd och höjd
+    // Prova cols 2..nInds, välj den där sz är störst men alla rader ryms
+    let bestCols = 2, bestSz = 0;
+    for (let c = 2; c <= nInds; c++) {
+      const rows = Math.ceil(nInds / c);
+      const szW  = Math.floor((stripW - 20 - (c - 1) * 4) / c);
+      const szH  = Math.floor((stripH - 20 - (rows - 1) * 4) / rows);
+      const s    = Math.min(szW, szH);
+      if (s >= 40 && s > bestSz) { bestSz = s; bestCols = c; }
+    }
+    cols = bestCols;
+    sz   = bestSz || 44;
+  }
+
+  strip.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  const lblFs = Math.max(8, Math.floor(sz * 0.095));
 
   const inds = buildIndicatorList(cfg, data).filter(ind => ind.sep === undefined);  const cells = strip.querySelectorAll('.omr-kpi-cell');
 
@@ -5361,6 +5380,8 @@ function toggleTBD(btn) {
   document.body.classList.toggle('hide-tbd', hiding);
   applyOmrGrpVisibility(hiding);
 }
+// Aktivera per default
+document.body.classList.add('hide-tbd');
 
 /* Markera grupplabels i omr-kpi-strip vars alla efterföljande celler är TBD */
 function applyOmrGrpVisibility(hiding) {
@@ -5427,7 +5448,10 @@ buildAll();
 let _resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(buildAll, 150);
+  _resizeTimer = setTimeout(() => {
+    buildAll();
+    if (omrActive) omrRender();
+  }, 150);
 });
 
 // Hämta SMHI och störningsdata direkt så översikten får live-data utan att
