@@ -3479,13 +3479,15 @@ function buildOmrKpiStrip(cfg, data) {
   let cols, sz;
   if (vw >= 1000) {
     cols = 2;
-    sz = Math.floor((290 - 20 - 4) / 2);
+    // strip 290px, strip-padding 10px*2=20, gap 4px, cell-padding 7px*2=14 per cell
+    sz = Math.floor((290 - 20 - 4) / 2) - 14;
     strip.style.width = '290px';
   } else {
     strip.style.width = '';
     cols = vw < 600 ? 3 : 4;
     const availW = stripW || vw;
-    sz = Math.floor(Math.max(44, (availW - 20 - (cols - 1) * 4) / cols));
+    const cellW  = Math.floor((availW - 20 - (cols - 1) * 4) / cols);
+    sz = Math.max(44, cellW - 14);
   }
 
   strip.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
