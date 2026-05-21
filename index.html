@@ -894,9 +894,29 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 /* ════════════════════════════════════════════════════════════
    RESPONSIV – Surfplatta (≤900px)
    ════════════════════════════════════════════════════════════ */
-@media (max-width: 1000px) {
+.fk-accordion { display: none; }
+.fk-acc-group {
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #555; padding: 10px 14px 4px; font-weight: 600;
+}
+.fk-acc-hdr {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; cursor: pointer; font-size: 13px; color: #ccc;
+  border-bottom: 1px solid #1a1a1a;
+}
+.fk-acc-hdr:hover { background: #111; color: #fff; }
+.fk-acc-item.open .fk-acc-hdr { color: #009FE3; }
+.fk-acc-arrow { font-size: 10px; transition: transform 0.2s; color: #555; }
+.fk-acc-item.open .fk-acc-arrow { transform: rotate(90deg); color: #009FE3; }
+.fk-acc-body { display: none; padding: 0 14px 14px; }
+.fk-acc-item.open .fk-acc-body { display: block; }
 
-  /* Topbar: dölj titeln, spar plats åt flikar */
+@media (max-width: 1000px) {
+  .fk-layout    { flex-direction: column; overflow: visible; }
+  .fk-nav       { display: none; }
+  .fk-panel     { display: none; }
+  .fk-accordion { display: block; }
+}
   .topbar-title { display: none; }
   .topbar-logo  { margin-right: 8px; }
   .topbar       { padding: 0 8px; }
@@ -996,7 +1016,7 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
       <div class="tab" data-tab="tomtom">TomTom</div>
       <div class="tab" data-tab="kollektivtrafik">Kollektivtrafik</div>
       <div class="tab" data-tab="vadervarningar">Vädervarningar</div>
-      <div class="tab" data-tab="forklaring">Förklaring</div>
+      <div class="tab" data-tab="forklaring">Om</div>
       <div class="tbd-toggle-wrap">
         <span class="tbd-toggle-lbl">Dölj TBD</span>
         <button class="tbd-toggle" id="tbd-toggle" onclick="toggleTBD(this)" aria-pressed="true">
@@ -1317,6 +1337,24 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   <!-- Förklaring -->
   <div class="tab-content" id="tab-forklaring">
     <div class="fk-layout">
+
+      <!-- Accordion-nav för mobil -->
+      <div class="fk-accordion" id="fk-accordion">
+        <div class="fk-acc-group">Väder &amp; händelser</div>
+        <div class="fk-acc-item" data-id="smhi"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>SMHI Vädervarningar</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="olyckor"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Olyckor</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="incidenter"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Incidenter</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="trafik"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Trafikpåverkan</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-group">Trafiktillstånd</div>
+        <div class="fk-acc-item" data-id="vaglag"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Väglag</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="tomtom"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>TomTom</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="tomtombarer"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>TomTom-barer</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="waze"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Waze</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="koll"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Kollektivtrafik</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-group">Beredskap</div>
+        <div class="fk-acc-item" data-id="mcs"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>MCS-trend</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+        <div class="fk-acc-item" data-id="vagarbete"><div class="fk-acc-hdr" onclick="fkAccToggle(this)"><span>Vägarbeten</span><span class="fk-acc-arrow">▸</span></div><div class="fk-acc-body"></div></div>
+      </div>
 
       <!-- Vänster nav -->
       <nav class="fk-nav">
@@ -4025,17 +4063,18 @@ const FK_CONTENT = {
 
   incidenter: {
     title: 'Incidenter',
-    tagline: 'Antal aktiva störningar exklusive olyckor',
+    tagline: 'Antal aktiva störningar exklusive olyckor och vägarbeten',
     svgType: 'count',
     svgData: { value: 7, redMax: 20 },
-    källa: 'Trafikverkets öppna API – Situation (övriga MessageCode)',
+    källa: 'Trafikverkets öppna API – Situation',
     url: 'https://api.trafikinfo.trafikverket.se',
     frekvens: 'storningar',
-    vad: `Räknar antalet <strong>aktiva störningar som inte är olyckor</strong> — t.ex. vägarbeten, hinder, restriktioner och övriga händelsetyper. 
-          Samma datakälla som Olyckor men komplementärt filter.`,
+    vad: `Räknar antalet <strong>aktiva störningar som varken är olyckor eller vägarbeten</strong> — 
+          t.ex. hinder på väg, restriktioner, fordonshaverier, djur på väg och övriga trafikmeddelanden. 
+          Samma datakälla som Olyckor men med filter på MessageType Hinder och Trafikmeddelande.`,
     beräkning: [
-      { text: 'Hämta alla aktiva Situation-objekt från Trafikverkets API.' },
-      { text: 'Filtrera på att <strong>MessageCode inte innehåller "olycka"</strong>.' },
+      { text: 'Hämta alla aktiva Situation-objekt med MessageType "Hinder" eller "Trafikmeddelande" från Trafikverkets API.' },
+      { text: 'Filtrera på att <strong>MessageCode inte innehåller "olycka"</strong> (säkerhetsnät för korsklassificerade händelser).' },
       { text: 'Filtrera på CountyNo för valt område.' },
       { text: () => `Räkna antalet matchande händelser. Röd gräns = <strong>${CONFIG.storningarRedMax}</strong> incidenter.` },
     ],
@@ -4251,9 +4290,12 @@ const FK_CONTENT = {
     </div>`,
     formel: `pct = bestPt.cum / total × 100 &nbsp;→&nbsp; <code>left: pct%</code> &nbsp;|&nbsp; dot = incVec · routeLocalVec`,
     skala: [
-      { color: '#c0392b', label: 'Röd triangel (A40) — hinder, trafikmeddelande' },
-      { color: '#e74c3c', label: 'Röd triangel (A41) — olycka' },
-      { color: '#ff8c00', label: 'Orange triangel med grävskovel — vägarbete (ManagedCause=true)' },
+      { color: '#e00', label: 'Röd cirkel, vit triangel med grävare — vägarbete med väg avstängd' },
+      { color: '#e67e22', label: 'Gul triangel med grävare (A40) — aktivt vägarbete' },
+      { color: '#e00', label: 'Röd cirkel, vit triangel med utrop — incident/hinder med väg avstängd' },
+      { color: '#c0392b', label: 'Gul triangel med utropstecken — hinder eller trafikmeddelande' },
+      { color: '#e00', label: 'Röd cirkel, vit triangel med krocksymbol — olycka med väg avstängd' },
+      { color: '#e74c3c', label: 'Gul triangel med krocksymbol (A41) — olycka' },
     ],
     täckning: () => `Alla aktiva TomTom-rutter. Sökradien för händelsematchning är <strong>${CONFIG.ttIncidentRadius} m</strong> (CONFIG.ttIncidentRadius). Riktningsfiltrering aktiveras endast vid AffectedDirectionValue = "OneDirection".`,
   },
@@ -4261,20 +4303,21 @@ const FK_CONTENT = {
 
   waze: {
     title: 'Waze',
-    tagline: 'Antal användare i köer rapporterade via Waze Partner Hub',
+    tagline: 'Trafikbelastning i köer från Waze Partner Hub',
     svgType: 'waze',
     svgData: { value: { green:120, yellow:45, orange:18, red:8, darkred:2 } },
     källa: 'Waze Partner Hub – TVT-feed (Traffic View Tool)',
     url: 'https://www.waze.com/row-partnerhub-api/feeds-tvt/',
     frekvens: 'waze',
-    vad: `Visar antalet <strong>Waze-användare som befinner sig i köer</strong>, fördelade på hastighetsnivåer 
-          (grön → mörkröd). Datan kommer från Waze Partner Hub via separata feed-URL:er för 
-          Göteborg (Region Västra) och Stockholm (Region Östra).`,
+    vad: `Visar <strong>trafikbelastning i köer</strong> fördelat på hastighetsnivåer (grön → mörkröd), 
+          baserat på aggregerad GPS-data från Waze-användare. Varje nivå representerar fordon/mätpunkter 
+          i ett visst hastighetsintervall relativt normalfart. Datan levereras via Waze Partner Hub 
+          med separata feed-URL:er för respektive region.`,
     beräkning: [
       { text: 'Hämta TVT-feed från Waze Partner Hub för respektive region.' },
-      { text: 'Varje post innehåller antal användare per hastighetsnivå: green, yellow, orange, red, darkred.' },
-      { text: 'Summera antal användare per nivå och visa som staplar i cirkeln.' },
-      { text: 'Totalt antal användare visas som siffra i mitten.' },
+      { text: 'Varje post innehåller aggregerade ködata per hastighetsnivå: green, yellow, orange, red, darkred.' },
+      { text: 'Summera värden per nivå och visa som staplar i cirkeln.' },
+      { text: 'Totalsumman visas som siffra i mitten.' },
     ],
     skala: [
       { color: '#2a8a2a', label: 'Grön — fri körning (>80% av normalfart)' },
@@ -4309,7 +4352,7 @@ const FK_CONTENT = {
       { color: '#d06000', label: 'Orange — tydlig försening' },
       { color: '#c01a1a', label: () => `Röd — ≥ ${CONFIG.kollRedMax} min genomsnittlig försening` },
     ],
-    täckning: 'Endast <strong>Region Östra</strong> (Stockholm/SL). Kräver SL-API-nyckel.',
+    täckning: 'Endast <strong>Region Östra</strong> (Stockholm/SL). SL:s realtids-API är öppet och kräver ingen API-nyckel.',
   },
 
   mcs: {
@@ -4326,7 +4369,7 @@ const FK_CONTENT = {
     beräkning: [
       { text: 'Hämta AverageVehicleSpeed från TrafficFlow-API för alla mätare i länet (VGR = 14, Stockholm = 1) var 60:e sekund.' },
       { text: 'Beräkna <strong>median</strong> av alla hastighetsvärden vid varje mättillfälle och lagra med tidsstämpel.' },
-      { text: 'Behåll 30 minuters historik. De första 15 minuterna visas en nedräkning i cirkeln.' },
+      { text: 'Behåll 30 minuters historik. Historik delas mellan alla aktiva browsers via Workers KV — ny browser får befintlig historik direkt vid sidladdning.' },
       { text: '<strong>Formel</strong>: <code>Trend = median(nu) − median(för 15 min sedan)</code>, avrundas till en decimal (km/h).' },
       { text: 'Pilen roteras linjärt: +1,9 km/h → uppåt (0°) · 0 → höger (90°) · −1,9 km/h → nedåt (180°).' },
     ],
@@ -4364,10 +4407,81 @@ const FK_CONTENT = {
   },
 };
 
+function fkAccToggle(hdr) {
+  const item = hdr.closest('.fk-acc-item');
+  const id   = item.dataset.id;
+  const body = item.querySelector('.fk-acc-body');
+  const isOpen = item.classList.contains('open');
+
+  // Stäng alla
+  document.querySelectorAll('.fk-acc-item.open').forEach(el => {
+    el.classList.remove('open');
+    el.querySelector('.fk-acc-body').innerHTML = '';
+  });
+
+  if (!isOpen) {
+    item.classList.add('open');
+    body.innerHTML = fkBuildHTML(id);
+  }
+}
+
+function fkBuildHTML(id) {
+  const def = FK_CONTENT[id];
+  if (!def) return '';
+
+  const freqMs  = def.frekvens ? CONFIG.interval[def.frekvens] : null;
+  const freqStr = freqMs
+    ? freqMs >= 3600000 ? (freqMs/3600000) + ' timme'
+    : freqMs >= 60000  ? (freqMs/60000) + ' minut' + (freqMs/60000 > 1 ? 'er' : '')
+    : (freqMs/1000) + ' sekunder'
+    : 'N/A';
+
+  const stepsHtml = def.beräkning.map((s,i) => {
+    const t = typeof s.text === 'function' ? s.text() : s.text;
+    return `<li class="fk-step"><span class="fk-step-num">${i+1}</span><span>${t}</span></li>`;
+  }).join('');
+
+  const formelHtml = def.formel
+    ? `<div class="fk-block"><div class="fk-block-title">Formel</div><div class="fk-formula">${def.formel}</div></div>`
+    : '';
+
+  const skalaHtml = def.skala.map(s => {
+    const lbl = typeof s.label === 'function' ? s.label() : s.label;
+    return `<div class="fk-scale-row"><span class="fk-swatch" style="background:${s.color}"></span><span>${lbl}</span></div>`;
+  }).join('');
+
+  const täckningHtml = typeof def.täckning === 'function' ? def.täckning() : def.täckning;
+
+  return `
+    <div class="fk-tagline" style="margin:8px 0 12px">${def.tagline}</div>
+    <div class="fk-block">
+      <div class="fk-block-title">Källa</div>
+      <div class="fk-scale-row">${def.källa}${freqMs ? ` · uppdateras var ${freqStr}` : ''}</div>
+    </div>
+    <div class="fk-block">
+      <div class="fk-block-title">Beräkning</div>
+      <ol class="fk-steps">${stepsHtml}</ol>
+    </div>
+    ${formelHtml}
+    <div class="fk-block">
+      <div class="fk-block-title">Färgskala</div>
+      ${skalaHtml}
+    </div>
+    <div class="fk-block">
+      <div class="fk-block-title">Täckning</div>
+      <div>${täckningHtml}</div>
+    </div>
+  `;
+}
+
 function fkShow(id, btn) {
-  // Nav highlight
+  // Nav highlight — btn kan vara null (dropdown/accordion)
   document.querySelectorAll('.fk-nav-item').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  // Synka dropdown om den finns
+  const sel = document.querySelector('.fk-select');
+  if (sel) sel.value = id;
 
   const def = FK_CONTENT[id];
   if (!def) return;
