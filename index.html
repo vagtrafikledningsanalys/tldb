@@ -2311,47 +2311,6 @@ async function fetchFlowAll() {
    ═══════════════════════════════════════════════════════════════ */
 const LIVEDATA = {};   // { regionId: { smhi, olyckor, storningar, … } }
 
-/* ── D1-loggning ── */
-// Skicka en snapshot per region till D1 var 5:e minut
-async function logSnapshot() {
-  try {
-    const now     = Math.floor(Date.now() / 1000);
-    const d       = new Date();
-    const hour    = d.getHours();
-    const weekday = d.getDay(); // 0=sön, 1=mån…
-
-    const rows = CONFIG.regioner.map(r => {
-      const live = LIVEDATA[r.id] || {};
-      return {
-        ts:         now,
-        hour,
-        weekday,
-        region_id:  r.id,
-        olyckor:    live.olyckor    ?? null,
-        incidenter: live.storningar ?? null,
-        vagarbeten: live.vagarbeten ?? null,
-        paverkan:   live.trafik     ?? null,
-        waze_koer:  live.waze       ?? null,
-        tomtom_idx: live.tomtom     ?? null,
-        vaglag:     live.vaglag     ?? null,
-      };
-    });
-
-    await fetch(`${PROXY_BASE}/log`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(rows),
-    });
-  } catch (e) {
-    console.warn('Loggning misslyckades:', e);
-  }
-}
-
-// Starta loggning efter 2 min (låt data hinna laddas), sedan var 5:e minut
-setTimeout(() => {
-  logSnapshot();
-  setInterval(logSnapshot, 5 * 60 * 1000);
-}, 2 * 60 * 1000);
 
 /**
  * Räknar om SMHI-nivå, olyckor och incidenter per region ur live-källorna
