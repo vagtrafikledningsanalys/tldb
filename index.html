@@ -1145,6 +1145,16 @@ html,body{
   background:linear-gradient(180deg, rgba(11,13,16,.6), rgba(7,8,9,.6));
   border-right:1px solid var(--line-1);
 }
+/* Responsiv override för overlayen – återställ full bredd på smala skärmar */
+@media (max-width: 1000px){
+  .omr-body{flex-direction:column;}
+  .omr-kpi-strip{
+    width:100%;
+    border-right:none;
+    border-bottom:1px solid var(--line-1);
+    background:linear-gradient(180deg, rgba(11,13,16,.6), rgba(7,8,9,.4));
+  }
+}
 .omr-kpi-cell{
   padding:8px 6px;border-radius:10px;
   border:1px solid transparent;
@@ -1240,6 +1250,121 @@ html,body{
 .dashboard::-webkit-scrollbar-thumb:hover{background:var(--text-4);}
 .omr-kpi-strip::-webkit-scrollbar-track,
 .dashboard::-webkit-scrollbar-track{background:transparent;}
+
+/* ════════════════════════════════════════════════════════════
+   ✦ TOMTOM BARS — v2 finish
+   ════════════════════════════════════════════════════════════ */
+
+/* Rad — mer luft, mjuk hover-glow, accentstrip vid hover */
+.omr-tt-row{
+  position:relative;
+  padding:14px 18px 16px !important;
+  border-bottom:1px solid var(--line-1) !important;
+  transition:background .2s ease;
+}
+.omr-tt-row::before{
+  content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  border-radius:0 2px 2px 0;opacity:0;transition:opacity .2s ease;
+}
+.omr-tt-row:hover::before{opacity:1;}
+.omr-tt-row:hover{background:rgba(26,173,235,.05) !important;}
+
+/* Ruttnamn — tydligare hierarki */
+.omr-tt-name{
+  font-family:'Inter',sans-serif;
+  font-size:12px;font-weight:500;color:var(--text-1);
+  letter-spacing:.01em;margin-bottom:10px !important;
+  text-transform:none;
+}
+
+/* Delay-värdet — mono, accentfärgkodat via inline-style ärvs */
+.omr-tt-delay{
+  font-family:'JetBrains Mono',monospace !important;
+  font-size:13px;font-weight:600;
+  font-variant-numeric:tabular-nums;
+  padding:2px 8px;border-radius:6px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--line-1);
+}
+
+/* Själva baren — slankare, rundad, med inre djup */
+.omr-tt-bar-wrap{
+  height:7px !important;
+  border-radius:999px !important;
+  background:rgba(255,255,255,.025);
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.45),
+    inset 0 0 0 1px rgba(255,255,255,.015);
+  overflow:visible !important;
+  padding:0;
+}
+.omr-tt-bar-container{
+  border-radius:999px;
+}
+
+/* Segment — dämpade toner & soft hover */
+.omr-tt-bar-wrap .tt-seg{
+  height:100%;
+  position:relative;
+  transition:filter .18s ease, transform .18s ease;
+}
+/* Rundade kanter på första/sista segmentet */
+.omr-tt-bar-wrap .tt-seg:first-child{border-radius:999px 0 0 999px;}
+.omr-tt-bar-wrap .tt-seg:last-child{border-radius:0 999px 999px 0;}
+.omr-tt-bar-wrap .tt-seg:only-child{border-radius:999px;}
+
+.omr-tt-bar-wrap .tt-seg:hover{
+  filter:brightness(1.18) saturate(1.05);
+  transform:scaleY(1.25);
+  z-index:2;
+}
+
+/* Färgschema — dämpat, mindre skrikande (särskilt grönt) */
+.omr-tt-bar-wrap .tt-seg-free   { background:linear-gradient(180deg,#5a8a6b,#456e54); }
+.omr-tt-bar-wrap .tt-seg-ok     { background:linear-gradient(180deg,#8a9c5a,#6b7f42); }
+.omr-tt-bar-wrap .tt-seg-slow   { background:linear-gradient(180deg,#d4a24a,#b8801e); }
+.omr-tt-bar-wrap .tt-seg-bad    { background:linear-gradient(180deg,#cc6a6a,#a83838); }
+.omr-tt-bar-wrap .tt-seg-closed { background:repeating-linear-gradient(45deg,#4a5060 0 4px,#353a48 4px 8px); }
+.omr-tt-bar-wrap .tt-seg-nodata { background:rgba(255,255,255,.04); }
+
+/* Incident-pin — moderniserad */
+.omr-tt-bar-container .tt-incident-pin{
+  top:-16px !important;
+  font-size:15px !important;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.7)) drop-shadow(0 0 6px rgba(26,173,235,.4));
+  transition:transform .18s ease;
+}
+.omr-tt-bar-container .tt-incident-pin:hover{
+  transform:translateX(-50%) scale(1.35) !important;
+}
+
+/* Loading shimmer — neutralare */
+.omr-tt-bar-wrap.tt-loading{
+  background:linear-gradient(90deg,
+    rgba(255,255,255,.02) 0%,
+    rgba(26,173,235,.08) 50%,
+    rgba(255,255,255,.02) 100%);
+  background-size:200% 100%;
+  animation:omr-tt-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes omr-tt-shimmer{
+  0%{background-position:200% 0;}
+  100%{background-position:-200% 0;}
+}
+
+/* Tooltip — uppdaterad */
+.tt-seg-tooltip{
+  background:rgba(11,13,16,.96) !important;
+  border:1px solid var(--line-2) !important;
+  border-radius:8px !important;
+  padding:8px 12px !important;
+  font-family:'Inter',sans-serif !important;
+  font-size:11px !important;
+  color:var(--text-1) !important;
+  box-shadow:0 12px 32px -8px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) !important;
+  backdrop-filter:blur(10px);
+}
 </style>
 </head>
 <body>
