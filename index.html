@@ -1258,7 +1258,7 @@ html,body{
 /* Rad — mer luft, mjuk hover-glow, accentstrip vid hover */
 .omr-tt-row{
   position:relative;
-  padding:6px 18px 8px !important;
+  padding:14px 18px 16px !important;
   border-bottom:1px solid var(--line-1) !important;
   transition:background .2s ease;
 }
@@ -1274,7 +1274,7 @@ html,body{
 .omr-tt-name{
   font-family:'Inter',sans-serif;
   font-size:12px;font-weight:500;color:var(--text-1);
-  letter-spacing:.01em;margin-bottom:5px !important;
+  letter-spacing:.01em;margin-bottom:10px !important;
   text-transform:none;
 }
 
@@ -5892,6 +5892,119 @@ vaglagInit();
 Promise.allSettled([_smhiReady, _tpReady])
   .then(() => { flowInit(); ttInit(); })
   .catch(()  => { flowInit(); ttInit(); });
+
+/* ═══════════════════════════════════════════════════════════════
+   DEEP LINKING
+   Sparar bara parametrar relevanta för aktiv flik i URL:en.
+
+   Stödda parametrar:
+     tab=oversikt|omrade|storningar|mcs|tomtom|kollektivtrafik|vadervarningar|forklaring
+     region=norra|mellersta|vastra|ostra|sydostra|sodra          (tab=omrade)
+     tc=TC+Nord|TC+Väst|TC+Öst|TC+Syd                           (tab=omrade)
+     storning_region|storning_tc|storning_county                 (tab=storningar)
+     smhi_level=ALL|RED|ORANGE|YELLOW|MESSAGE                    (tab=vadervarningar)
+     smhi_area=ALL|norra|mellersta|ostra|vastra|sydostra|sodra   (tab=vadervarningar)
+   ═══════════════════════════════════════════════════════════════ */
+
+function deepLinkWrite() {
+  const p = new URLSearchParams();
+
+  const activeTab = document.querySelector('.tab.active');
+  const tabId = activeTab ? activeTab.dataset.tab : 'oversikt';
+  p.set('tab', tabId);
+
+  // Skriv bara parametrar relevanta för aktiv flik
+  if (tabId === 'omrade' && omrActive) {
+    if (omrActive.type === 'region') p.set('region', omrActive.id);
+    else                             p.set('tc',     omrActive.id);
+  }
+
+  if (tabId === 'storningar' && tpActiveGroup !== 'all' && tpActiveVals.size) {
+    const val = [...tpActiveVals][0];
+    if      (tpActiveGroup === 'region') p.set('storning_region', val);
+    else if (tpActiveGroup === 'tc')     p.set('storning_tc',     val);
+    else if (tpActiveGroup === 'county') p.set('storning_county', val);
+  }
+
+  if (tabId === 'vadervarningar') {
+    if (smhiFilterLevel !== 'ALL') p.set('smhi_level', smhiFilterLevel);
+    if (smhiFilterArea  !== 'ALL') p.set('smhi_area',  smhiFilterArea);
+  }
+
+  const newUrl = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+  history.replaceState(null, '', newUrl);
+}
+
+function deepLinkRead() {
+  const p = new URLSearchParams(window.location.search);
+
+  const tab = p.get('tab');
+  if (tab) {
+    const tabEl = document.querySelector('.tab[data-tab="' + tab + '"]');
+    if (tabEl) tabEl.click();
+  }
+
+  const region = p.get('region');
+  const tc     = p.get('tc');
+  if (region) {
+    const btn = document.querySelector('#omr-region-pills .omr-pill[onclick*="\'' + region + '\'"]');
+    if (btn) omrSelect('region', region, btn);
+  } else if (tc) {
+    const btn = document.querySelector('#omr-tc-pills .omr-pill[onclick*="\'' + tc + '\'"]');
+    if (btn) omrSelect('tc', tc, btn);
+  }
+
+  const sRegion = p.get('storning_region');
+  const sTc     = p.get('storning_tc');
+  const sCounty = p.get('storning_county');
+  if (sRegion || sTc || sCounty) {
+    const val   = sRegion || sTc || sCounty;
+    const group = sRegion ? 'region' : sTc ? 'tc' : 'county';
+    const btn   = document.querySelector(
+      '#tp-county-pills .omr-pill[data-group="' + group + '"][data-val="' + val + '"]'
+    );
+    if (btn) tpPillClick(btn);
+  }
+
+  const smhiLevel = p.get('smhi_level');
+  const smhiArea  = p.get('smhi_area');
+  if (smhiLevel) {
+    const btn = document.querySelector('button[onclick*="smhiSetFilter(\'level\',\'' + smhiLevel + '\'"]');
+    if (btn) smhiSetFilter('level', smhiLevel, btn);
+  }
+  if (smhiArea) {
+    const btn = document.querySelector('button[onclick*="smhiSetFilter(\'area\',\'' + smhiArea + '\'"]');
+    if (btn) smhiSetFilter('area', smhiArea, btn);
+  }
+}
+
+(function patchNavigation() {
+  // Flikar – rensa flik-specifika params när man byter flik
+  document.querySelectorAll('.tab').forEach(function(t) {
+    t.addEventListener('click', deepLinkWrite, { capture: false });
+  });
+
+  var _omrSelect = omrSelect;
+  window.omrSelect = function(type, id, el) {
+    _omrSelect(type, id, el);
+    deepLinkWrite();
+  };
+
+  var _tpPillClick = tpPillClick;
+  window.tpPillClick = function(el) {
+    _tpPillClick(el);
+    deepLinkWrite();
+  };
+
+  var _smhiSetFilter = smhiSetFilter;
+  window.smhiSetFilter = function(type, value, el) {
+    _smhiSetFilter(type, value, el);
+    deepLinkWrite();
+  };
+})();
+
+deepLinkRead();
+
 </script>
 <!-- Segment-tooltip – global, utanför alla flikar -->
 <div class="tt-seg-tooltip" id="ttSegTooltip"></div>
