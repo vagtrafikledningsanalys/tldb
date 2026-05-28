@@ -1081,10 +1081,13 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   .topbar-logo  { margin-right: 8px; }
   .topbar       { padding: 0 8px; }
 
-  /* Tillåt scroll på smal skärm */
+  /* Tillåt scroll på smal skärm — men INTE Live Map (kartan behöver fast höjd) */
   html, body     { overflow: auto; height: auto; }
   .appshell      { height: auto; min-height: 100vh; }
-  .tab-content   { min-height: 0; overflow: visible; flex: none; }
+  .tab-content:not(#tab-livemap)   { min-height: 0; overflow: visible; flex: none; }
+  /* Live Map: håll full viewport-höjd minus topbar */
+  #tab-livemap   { height: calc(100vh - 44px); flex: none; overflow: hidden; }
+  #livemap-container { height: 100%; flex: none; }
   .dashboard     { overflow: visible; }
   .rc            { overflow: visible; }
 
@@ -1095,6 +1098,8 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   .tab[data-tab="kollektivtrafik"],
   .tab[data-tab="vader"],
   .tab[data-tab="vadervarningar"] { display: none; }
+  /* Live Map visas alltid – är optimerad för mobil */
+  .tab[data-tab="livemap"] { display: flex; }
 
   /* Översikt: JS hanterar kolumnantal dynamiskt */
 
@@ -1617,8 +1622,27 @@ html,body{
   width:6px; height:6px; background:#2ecc71; border-radius:50%;
   animation:tt-pulse 2s infinite;
 }
-/* Tile attribution – flytta ner på mobil */
+/* Tile attribution */
 .leaflet-control-attribution { font-size:9px !important; }
+
+/* Live Map mobil-anpassning */
+@media (max-width: 600px) {
+  /* Telefon: justera höjd för 38px topbar */
+  #tab-livemap { height: calc(100vh - 38px) !important; }
+  #livemap-legend {
+    bottom: auto;
+    top: 8px;
+    left: 8px;
+    right: auto;
+    padding: 8px 10px 10px;
+    min-width: 140px;
+    max-width: calc(100vw - 100px);
+  }
+  #livemap-legend h3 { margin-bottom: 7px; }
+  .lm-layer-row { margin-bottom: 5px; }
+  .lm-layer-label { font-size: 11px; }
+  #livemap-livebadge { top: 8px; right: 8px; }
+}
 /* Popup-styling */
 .lm-popup .leaflet-popup-content-wrapper {
   background:#111318; border:1px solid #2a2a2a;
@@ -6203,7 +6227,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     }
     if (target === 'kollektivtrafik') ktInit();
     if (target === 'vadervarningar') smhiInit();
-    if (target === 'livemap') lmInit();
+    if (target === 'livemap') { lmInit(); setTimeout(() => { if (lmMap) lmMap.invalidateSize(); }, 120); }
   });
 });
 
@@ -6397,11 +6421,11 @@ function lmInit() {
   lmGroups.storningar = L.layerGroup().addTo(lmMap);
   lmGroups.vagarbeten = L.layerGroup().addTo(lmMap);
 
-  // Rendera direkt om data redan finns — men ge DOM 50ms att layoutas
+  // Rendera direkt om data redan finns — ge DOM tid att layoutas (extra marginal för mobil)
   setTimeout(() => {
     lmMap.invalidateSize();
     lmRefresh();
-  }, 60);
+  }, 120);
 
   // Återrendera vid window resize
   window.addEventListener('resize', () => {
@@ -6411,7 +6435,8 @@ function lmInit() {
 
 function lmRefresh() {
   if (!lmMap) return;
-  lmMap.invalidateSize();
+  // Tvinga Leaflet att räkna om storlek (viktigt direkt efter flik-byte)
+  lmMap.invalidateSize({ pan: false });
   lmRenderRoutes();
   lmRenderMarkers();
 }
