@@ -6118,6 +6118,8 @@ async function ttLoadRoutes() {
     ttUpdateLivedataWDI();
     if (document.getElementById('tab-oversikt')?.classList.contains('active')) buildAll();
     omrUpdate();
+    // Live Map: rendera rutter nu när segmentfärger är klara
+    if (lmMap) lmRenderRoutes();
   } catch (err) {
     document.getElementById('tt-routeList').innerHTML =
       `<div class="tt-error-box"><div class="tt-error-title">Kunde inte hämta rutter</div><div class="tt-error-msg">${ttEsc(err.message)}</div></div>`;
@@ -6417,46 +6419,49 @@ function lmRefresh() {
 // ── Restidsrutter ─────────────────────────────────────────────
 function lmRenderRoutes() {
   lmGroups.routes.clearLayers();
-  if (!lmLayerVisible.routes) return;
-  if (!ttState.initialized || !ttState.routeShapeCache.size) return;
+  if (!ttState.initialized) return;
 
-  for (const [routeId, { pts }] of ttState.routeShapeCache) {
-    if (!pts || pts.length < 2) continue;
-    const segs = ttState.segmentsCache.get(routeId);
+  for (const r of ttState.routes) {
+    if (r.routeStatus !== 'ACTIVE') continue;
+    const segs = ttState.segmentsCache.get(r.routeId);
+    const name = r.routeName || r.routeId;
+
     if (!segs || !segs.length) {
-      // Rita grå linje om inga segment-detaljer finns
-      const latlngs = pts.map(p => [p.lat, p.lon]);
-      L.polyline(latlngs, {
-        color: LM_SEG_COLORS['tt-seg-nodata'],
-        weight: 4, opacity: 0.7,
-      }).addTo(lmGroups.routes);
+      // Detaljer ännu ej laddade — rita rutten grå från shape-cache
+      const shape = ttState.routeShapeCache.get(r.routeId);
+      if (!shape || shape.pts.length < 2) continue;
+      const latlngs = shape.pts.map(p => [p.lat, p.lon]);
+      L.polyline(latlngs, { color: LM_SEG_COLORS['tt-seg-nodata'], weight: 4, opacity: 0.5 })
+        .bindPopup(`<div class="lm-popup-title">${name}</div><div class="lm-popup-sub">Laddar segmentdata…</div>`,
+          { className: 'lm-popup', maxWidth: 260 })
+        .addTo(lmGroups.routes);
       continue;
     }
 
-    // Bygg kumulativ pts-karta (samma som ttBuildShapeCache)
-    const totalDist = pts[pts.length - 1].cum;
-
-    // Rita varje segment som en färgad polyline
+    // Rita varje segment med korrekt hastighetsklassfärg
+    // Rätt fältnamn: typicalSpeed (inte freeFlowSpeed)
     for (const seg of segs) {
-      const cls = ttSegColor(seg.currentSpeed, seg.freeFlowSpeed);
-      const color = LM_SEG_COLORS[cls] || LM_SEG_COLORS['tt-seg-nodata'];
-
-      // Hitta koordinater som hör till detta segment via startPct/endPct
       if (!seg.shape || seg.shape.length < 2) continue;
+      const cls   = ttSegColor(seg.currentSpeed, seg.typicalSpeed);
+      const color = LM_SEG_COLORS[cls] || LM_SEG_COLORS['tt-seg-nodata'];
       const latlngs = seg.shape.map(p => [p.latitude, p.longitude]);
 
-      const route = ttState.routes.find(r => r.routeId === routeId);
-      const name  = route ? (route.routeName || routeId) : routeId;
-      const ratio = seg.freeFlowSpeed > 0 ? (seg.currentSpeed / seg.freeFlowSpeed) : null;
+      const ratio = seg.typicalSpeed > 0 ? seg.currentSpeed / seg.typicalSpeed : null;
       const pct   = ratio != null ? Math.round(ratio * 100) : null;
       const popup = `<div class="lm-popup-title">${name}</div>
-        <div class="lm-popup-sub">${seg.currentSpeed != null ? seg.currentSpeed + ' km/h' : '—'} / ${seg.freeFlowSpeed != null ? seg.freeFlowSpeed + ' km/h friflöde' : '—'}${pct != null ? ' (' + pct + '%)' : ''}</div>`;
+        <div class="lm-popup-sub">${seg.currentSpeed != null ? seg.currentSpeed + ' km/h' : '—'} / typisk ${seg.typicalSpeed != null ? seg.typicalSpeed + ' km/h' : '—'}${pct != null ? ' (' + pct + '%)' : ''}</div>`;
 
-      L.polyline(latlngs, {
-        color, weight: 5, opacity: 0.85,
-      }).bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+      L.polyline(latlngs, { color, weight: 5, opacity: 0.85 })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
         .addTo(lmGroups.routes);
     }
+  }
+
+  // Visa/dölj lagret baserat på toggle-state
+  if (!lmLayerVisible.routes) {
+    lmMap.removeLayer(lmGroups.routes);
+  } else if (!lmMap.hasLayer(lmGroups.routes)) {
+    lmGroups.routes.addTo(lmMap);
   }
 }
 
@@ -6482,8 +6487,8 @@ function lmRenderMarkers() {
   lmGroups.storningar.clearLayers();
   lmGroups.vagarbeten.clearLayers();
 
-  const icoOlycka   = lmMarkerIcon('#c0281a', '⚠');
-  const icoStorning = lmMarkerIcon('#c07010', '⚡');
+  const icoOlycka    = lmMarkerIcon('#c0281a', '⚠');
+  const icoStorning  = lmMarkerIcon('#c07010', '⚡');
   const icoVagarbete = lmMarkerIcon('#0070a0', '🔧');
 
   // Olyckor och incidenter från ttState.tvIncidents
@@ -6494,12 +6499,10 @@ function lmRenderMarkers() {
       <div class="lm-popup-sub">${inc.location || inc.message || '—'}</div>`;
 
     if (isOlycka) {
-      if (!lmLayerVisible.incidents) continue;
       L.marker([inc.lat, inc.lon], { icon: icoOlycka })
         .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
         .addTo(lmGroups.incidents);
     } else {
-      if (!lmLayerVisible.storningar) continue;
       L.marker([inc.lat, inc.lon], { icon: icoStorning })
         .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
         .addTo(lmGroups.storningar);
@@ -6507,25 +6510,40 @@ function lmRenderMarkers() {
   }
 
   // Vägarbeten
-  if (lmLayerVisible.vagarbeten) {
-    for (const va of ttState.tvVagarbeten) {
-      if (!va.lat || !va.lon) continue;
-      const popup = `<div class="lm-popup-title">${va.code || 'Vägarbete'}</div>
-        <div class="lm-popup-sub">${va.location || va.message || '—'}${va.roadNumber ? ' · Väg ' + va.roadNumber : ''}</div>`;
-      L.marker([va.lat, va.lon], { icon: icoVagarbete })
-        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
-        .addTo(lmGroups.vagarbeten);
+  for (const va of ttState.tvVagarbeten) {
+    if (!va.lat || !va.lon) continue;
+    const popup = `<div class="lm-popup-title">${va.code || 'Vägarbete'}</div>
+      <div class="lm-popup-sub">${va.location || va.message || '—'}${va.roadNumber ? ' · Väg ' + va.roadNumber : ''}</div>`;
+    L.marker([va.lat, va.lon], { icon: icoVagarbete })
+      .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+      .addTo(lmGroups.vagarbeten);
+  }
+
+  // Synkronisera synlighet med toggle-state
+  for (const key of ['incidents', 'storningar', 'vagarbeten']) {
+    const grp = lmGroups[key];
+    if (lmLayerVisible[key]) {
+      if (!lmMap.hasLayer(grp)) grp.addTo(lmMap);
+    } else {
+      if (lmMap.hasLayer(grp)) lmMap.removeLayer(grp);
     }
   }
 }
 
 // ── Lager-toggle ──────────────────────────────────────────────
 function lmToggleLayer(key) {
+  if (!lmMap) return;
   lmLayerVisible[key] = !lmLayerVisible[key];
   const row = document.getElementById('lm-row-' + key);
   if (row) row.classList.toggle('active', lmLayerVisible[key]);
-  if (key === 'routes') lmRenderRoutes();
-  else lmRenderMarkers();
+
+  const grp = lmGroups[key];
+  if (!grp) return;
+  if (lmLayerVisible[key]) {
+    if (!lmMap.hasLayer(grp)) grp.addTo(lmMap);
+  } else {
+    if (lmMap.hasLayer(grp)) lmMap.removeLayer(grp);
+  }
 }
 
 deepLinkRead();
