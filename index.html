@@ -3972,8 +3972,11 @@ function omrResolve(type, id) {
       const r = LEVEL_RANK[d.smhi] ?? 0;
       if (r > smhiMax) smhiMax = r;
     }
-    if (d.olyckor    != null) { olyckor    += d.olyckor;    hasData = true; }
-    if (d.storningar != null) { storningar += d.storningar; hasData = true; }
+
+    // Olyckor/störningar/trafik hanteras separat nedan för att undvika
+    // dubbelräkning när en händelse spänner över flera länsnummer/regioner.
+    // Vi hoppar över dessa här och beräknar dem direkt från tpData istället.
+
     if (d.trafik     != null) { trafik     += d.trafik;     hasData = true; }
     if (d.vaglag     != null) { vaglagSum  += d.vaglag;     vaglagCnt++; }
     if (d.waze) {
@@ -3985,6 +3988,26 @@ function omrResolve(type, id) {
     if (d.mcsTrend != null) { mcsTrendSum += d.mcsTrend; mcsTrendCnt++; }
     if (d.vagarbeten != null) vagarbeten  += d.vagarbeten;
   });
+
+  // ── Räkna olyckor/störningar direkt från tpData för att undvika
+  //    dubbelräkning när en händelse har länsnummer som matchar flera regioner.
+  //    Använder exakt samma filterlogik som renderTPTable (störningslistan):
+  //    TC-filter: getTC(nos[0]) — dvs. primärt länsnummer avgör TC-tillhörighet.
+  //    Region-filter: nos.some(n => COUNTY_AREA[n] === regionId).
+  if (tpData.length > 0) {
+    hasData = true;
+    const filteredRows = tpData.filter(({dev}) => {
+      if (type === 'tc') {
+        // Samma logik som renderTPTable: TC_MAP[nos[0]]
+        return getTC(dev.CountyNo) === id;
+      } else {
+        // Region: minst ett länsnummer matchar regionen
+        return toCountyNos(dev.CountyNo).some(n => COUNTY_AREA[n] === id);
+      }
+    });
+    olyckor    = filteredRows.filter(r => (r.dev.MessageType||'').toLowerCase() === 'olycka').length;
+    storningar = filteredRows.filter(r => (r.dev.MessageType||'').toLowerCase() !== 'olycka').length;
+  }
 
   const data = {
     smhi:       smhiMax > 0 ? RANK_LEVEL[smhiMax] : (smhiFetched ? 'none' : null),
