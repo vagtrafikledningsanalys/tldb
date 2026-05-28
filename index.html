@@ -1564,62 +1564,92 @@ html,body{
 /* Legend */
 #livemap-legend {
   position:absolute; bottom:24px; left:12px; z-index:900;
-  background:rgba(10,10,10,0.92);
-  border:1px solid #2a2a2a;
-  border-radius:10px;
-  padding:10px 14px 12px;
-  min-width:170px;
-  backdrop-filter:blur(6px);
-  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+  background:linear-gradient(180deg,rgba(16,18,22,0.94),rgba(10,11,14,0.94));
+  border:1px solid #2a2d33;
+  border-radius:12px;
+  padding:12px 14px 13px;
+  min-width:186px;
+  backdrop-filter:blur(10px) saturate(140%);
+  -webkit-backdrop-filter:blur(10px) saturate(140%);
+  box-shadow:0 8px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
   user-select:none;
 }
+.lm-legend-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:10px; margin:0 0 10px;
+}
 #livemap-legend h3 {
-  font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
-  color:#888; margin:0 0 10px; font-weight:600;
+  font-size:10px; letter-spacing:0.16em; text-transform:uppercase;
+  color:#9aa0a8; margin:0; font-weight:600;
+}
+.lm-legend-count{
+  font-family:'DM Mono',ui-monospace,monospace;
+  font-size:10px; color:#5a6068; letter-spacing:0.04em;
+  font-variant-numeric:tabular-nums;
 }
 .lm-layer-row {
-  display:flex; align-items:center; gap:8px;
+  display:flex; align-items:center; gap:9px;
   margin-bottom:7px; cursor:pointer;
+  padding:3px 4px; margin-left:-4px; margin-right:-4px;
+  border-radius:5px;
+  transition:background 0.12s;
 }
-.lm-layer-row:last-child { margin-bottom:0; }
+.lm-layer-row:hover { background:rgba(255,255,255,0.03); }
+.lm-layer-row:last-of-type { margin-bottom:0; }
 .lm-layer-check {
   width:14px; height:14px; border-radius:3px;
   border:1px solid #333; background:#1a1a1a;
   flex-shrink:0; display:flex; align-items:center; justify-content:center;
-  transition:background 0.15s, border-color 0.15s;
+  transition:background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.lm-layer-row.active .lm-layer-check { background:#009FE3; border-color:#009FE3; }
+.lm-layer-row.active .lm-layer-check {
+  background:#009FE3; border-color:#009FE3;
+  box-shadow:0 0 0 3px rgba(0,159,227,0.12);
+}
 .lm-layer-row.active .lm-layer-check::after {
   content:''; display:block; width:8px; height:8px;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.5l2.5 2.5 4.5-5' stroke='white' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 .lm-layer-icon {
   width:14px; height:14px; border-radius:50%; flex-shrink:0;
+  box-shadow:0 0 6px currentColor;
 }
-.lm-layer-label { font-size:12px; color:#ccc; }
+.lm-layer-label { font-size:12px; color:#d0d3d8; letter-spacing:0.01em; }
+.lm-layer-row:not(.active) .lm-layer-label { color:#6a6e75; }
 /* Färgskala i legenden */
 .lm-seg-scale {
-  display:flex; gap:2px; margin-top:10px; padding-top:10px;
-  border-top:1px solid #1e1e1e;
+  display:flex; gap:2px; margin-top:11px; padding-top:11px;
+  border-top:1px solid #1e2025;
 }
 .lm-seg-swatch {
   flex:1; height:6px; border-radius:2px;
 }
 .lm-seg-labels {
   display:flex; justify-content:space-between;
-  margin-top:3px; font-size:9px; color:#666; letter-spacing:0.04em;
+  margin-top:4px; font-size:9px; color:#666; letter-spacing:0.06em;
+  text-transform:uppercase;
 }
 /* Live-badge på kartan */
 #livemap-livebadge {
   position:absolute; top:10px; right:10px; z-index:900;
-  display:flex; align-items:center; gap:6px;
-  background:rgba(10,10,10,0.88); border:1px solid rgba(46,204,113,0.3);
-  border-radius:20px; padding:4px 10px;
-  font-size:10px; color:#2ecc71; letter-spacing:0.08em; text-transform:uppercase;
-  backdrop-filter:blur(4px);
+  display:flex; align-items:center; gap:7px;
+  background:rgba(10,12,15,0.9); border:1px solid rgba(46,204,113,0.35);
+  border-radius:20px; padding:5px 12px;
+  font-size:10px; color:#2ecc71; letter-spacing:0.1em; text-transform:uppercase;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 2px 12px rgba(0,0,0,0.4), 0 0 0 1px rgba(46,204,113,0.06);
+  font-weight:600;
+}
+#livemap-livebadge .lm-badge-sep { color:#2a4a38; margin:0 1px; }
+#livemap-livebadge #livemap-updated{
+  color:#7fd9a5; font-family:'DM Mono',ui-monospace,monospace;
+  letter-spacing:0.04em; font-weight:500;
+  font-variant-numeric:tabular-nums;
 }
 #livemap-livebadge .lm-dot {
-  width:6px; height:6px; background:#2ecc71; border-radius:50%;
+  width:7px; height:7px; background:#2ecc71; border-radius:50%;
+  box-shadow:0 0 8px rgba(46,204,113,0.7);
   animation:tt-pulse 2s infinite;
 }
 /* Tile attribution */
@@ -1905,9 +1935,17 @@ html,body{
   <div class="tab-content" id="tab-livemap">
     <div id="livemap-container">
       <div id="livemap"></div>
-      <div id="livemap-livebadge"><div class="lm-dot"></div>Realtid</div>
+      <div id="livemap-livebadge">
+        <div class="lm-dot"></div>
+        <span>Realtid</span>
+        <span class="lm-badge-sep">·</span>
+        <span id="livemap-updated">--:--:--</span>
+      </div>
       <div id="livemap-legend">
-        <h3>Lager</h3>
+        <div class="lm-legend-head">
+          <h3>Kartlager</h3>
+          <span class="lm-legend-count" id="lm-route-count">0 rutter</span>
+        </div>
         <div class="lm-layer-row active" id="lm-row-routes" onclick="lmToggleLayer('routes')">
           <div class="lm-layer-check"></div>
           <div class="lm-layer-icon" style="background:linear-gradient(90deg,#4a7c59,#f39c12,#e74c3c);border-radius:3px;height:5px;width:14px;margin-top:0"></div>
@@ -6384,6 +6422,13 @@ const lmLayerVisible = { routes: true, incidents: true, storningar: true, vagarb
 // Leaflet-lagergrupper (skapas vid init)
 const lmGroups = { routes: null, incidents: null, storningar: null, vagarbeten: null };
 
+// ── Diff-cache för restidsrutter ──
+// Nyckel: `${routeId}::${segIdx}` för segmentpolyliner,
+//         `${routeId}::__placeholder` för grå fallback-rutter.
+// Värde: { layer, color, key, sig } där sig = signatur för latlngs så vi
+// vet om vi behöver byta linjegeometri.
+const lmRouteLayers = new Map();
+
 // Segment-färger (matchar tt-seg-* CSS)
 const LM_SEG_COLORS = {
   'tt-seg-free':   '#4a7c59',
@@ -6439,55 +6484,134 @@ function lmRefresh() {
   lmMap.invalidateSize({ pan: false });
   lmRenderRoutes();
   lmRenderMarkers();
+  lmStampUpdated();
 }
 
-// ── Restidsrutter ─────────────────────────────────────────────
+function lmStampUpdated(){
+  const el = document.getElementById('livemap-updated');
+  if (!el) return;
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  el.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// Snabb signatur för en latlngs-lista (start, mitten, slut + längd).
+// Räcker i praktiken för att upptäcka geometriändringar utan O(n)-jämförelse.
+function lmShapeSig(latlngs){
+  const n = latlngs.length;
+  if (!n) return '0';
+  const a = latlngs[0], b = latlngs[(n/2)|0], c = latlngs[n-1];
+  return `${n}|${a[0].toFixed(5)},${a[1].toFixed(5)}|${b[0].toFixed(5)},${b[1].toFixed(5)}|${c[0].toFixed(5)},${c[1].toFixed(5)}`;
+}
+
+// ── Restidsrutter (diffing — uppdaterar utan att blinka) ──────
 function lmRenderRoutes() {
-  lmGroups.routes.clearLayers();
-  if (!ttState.initialized) return;
+  if (!ttState.initialized) {
+    // Inget att rita ännu — låt ev. tidigare lager stå kvar.
+    return;
+  }
+
+  const seen = new Set();
+  let activeCount = 0;
+
+  // Bygg upp önskad uppsättning polyliner
+  const desired = []; // { key, latlngs, color, popup, sig }
 
   for (const r of ttState.routes) {
     if (r.routeStatus !== 'ACTIVE') continue;
+    activeCount++;
     const segs = ttState.segmentsCache.get(r.routeId);
     const name = r.routeName || r.routeId;
 
     if (!segs || !segs.length) {
-      // Detaljer ännu ej laddade — rita rutten grå från shape-cache
+      // Fallback: rita rutten grå tills segmentdata kommer
       const shape = ttState.routeShapeCache.get(r.routeId);
       if (!shape || shape.pts.length < 2) continue;
       const latlngs = shape.pts.map(p => [p.lat, p.lon]);
-      L.polyline(latlngs, { color: LM_SEG_COLORS['tt-seg-nodata'], weight: 4, opacity: 0.5 })
-        .bindPopup(`<div class="lm-popup-title">${name}</div><div class="lm-popup-sub">Laddar segmentdata…</div>`,
-          { className: 'lm-popup', maxWidth: 260 })
-        .addTo(lmGroups.routes);
+      desired.push({
+        key: `${r.routeId}::__placeholder`,
+        latlngs,
+        color: LM_SEG_COLORS['tt-seg-nodata'],
+        weight: 4,
+        opacity: 0.5,
+        popup: `<div class="lm-popup-title">${name}</div><div class="lm-popup-sub">Laddar segmentdata…</div>`,
+        sig: lmShapeSig(latlngs),
+      });
       continue;
     }
 
-    // Rita varje segment med korrekt hastighetsklassfärg
-    // Rätt fältnamn: typicalSpeed (inte freeFlowSpeed)
-    for (const seg of segs) {
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
       if (!seg.shape || seg.shape.length < 2) continue;
       const cls   = ttSegColor(seg.currentSpeed, seg.typicalSpeed);
       const color = LM_SEG_COLORS[cls] || LM_SEG_COLORS['tt-seg-nodata'];
       const latlngs = seg.shape.map(p => [p.latitude, p.longitude]);
-
       const ratio = seg.typicalSpeed > 0 ? seg.currentSpeed / seg.typicalSpeed : null;
       const pct   = ratio != null ? Math.round(ratio * 100) : null;
       const popup = `<div class="lm-popup-title">${name}</div>
         <div class="lm-popup-sub">${seg.currentSpeed != null ? seg.currentSpeed + ' km/h' : '—'} / typisk ${seg.typicalSpeed != null ? seg.typicalSpeed + ' km/h' : '—'}${pct != null ? ' (' + pct + '%)' : ''}</div>`;
 
-      L.polyline(latlngs, { color, weight: 5, opacity: 0.85 })
-        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+      desired.push({
+        key: `${r.routeId}::${i}`,
+        latlngs,
+        color,
+        weight: 5,
+        opacity: 0.85,
+        popup,
+        sig: lmShapeSig(latlngs),
+      });
+    }
+  }
+
+  // Diff: uppdatera/skapa
+  for (const d of desired) {
+    seen.add(d.key);
+    const existing = lmRouteLayers.get(d.key);
+    if (existing) {
+      // Uppdatera bara det som ändrats — ingen flicker
+      if (existing.color !== d.color || existing.weight !== d.weight || existing.opacity !== d.opacity) {
+        existing.layer.setStyle({ color: d.color, weight: d.weight, opacity: d.opacity });
+        existing.color = d.color;
+        existing.weight = d.weight;
+        existing.opacity = d.opacity;
+      }
+      if (existing.sig !== d.sig) {
+        existing.layer.setLatLngs(d.latlngs);
+        existing.sig = d.sig;
+      }
+      if (existing.popup !== d.popup) {
+        existing.layer.setPopupContent(d.popup);
+        existing.popup = d.popup;
+      }
+    } else {
+      const layer = L.polyline(d.latlngs, { color: d.color, weight: d.weight, opacity: d.opacity })
+        .bindPopup(d.popup, { className: 'lm-popup', maxWidth: 260 })
         .addTo(lmGroups.routes);
+      lmRouteLayers.set(d.key, {
+        layer, color: d.color, weight: d.weight, opacity: d.opacity,
+        popup: d.popup, sig: d.sig,
+      });
+    }
+  }
+
+  // Ta bort polyliner som inte längre finns i den nya uppsättningen
+  for (const [key, entry] of lmRouteLayers) {
+    if (!seen.has(key)) {
+      lmGroups.routes.removeLayer(entry.layer);
+      lmRouteLayers.delete(key);
     }
   }
 
   // Visa/dölj lagret baserat på toggle-state
   if (!lmLayerVisible.routes) {
-    lmMap.removeLayer(lmGroups.routes);
+    if (lmMap.hasLayer(lmGroups.routes)) lmMap.removeLayer(lmGroups.routes);
   } else if (!lmMap.hasLayer(lmGroups.routes)) {
     lmGroups.routes.addTo(lmMap);
   }
+
+  // Uppdatera ruttsräknaren i legenden
+  const cnt = document.getElementById('lm-route-count');
+  if (cnt) cnt.textContent = `${activeCount} ${activeCount === 1 ? 'rutt' : 'rutter'}`;
 }
 
 // ── Markörer: olyckor, incidenter, vägarbeten ────────────────
