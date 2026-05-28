@@ -6444,6 +6444,17 @@ const LM_SEG_COLORS = {
   'tt-seg-nodata': '#2a3040',
 };
 
+// Stapelordning vid överlapp: högre värde = ritas överst.
+// Långsammaste/värsta trafiken vinner så att problem syns även vid utzoomning.
+const LM_SEG_PRIORITY = {
+  'tt-seg-closed': 100,
+  'tt-seg-bad':     90,
+  'tt-seg-slow':    70,
+  'tt-seg-ok':      40,
+  'tt-seg-free':    20,
+  'tt-seg-nodata':   5,
+};
+
 function lmInit() {
   if (lmInitialized) { lmRefresh(); return; }
   lmInitialized = true;
@@ -6541,6 +6552,8 @@ function lmRenderRoutes() {
         opacity: 0.5,
         popup: `<div class="lm-popup-title">${name}</div><div class="lm-popup-sub">Laddar segmentdata…</div>`,
         sig: lmShapeSig(latlngs),
+        priority: LM_SEG_PRIORITY['tt-seg-nodata'],
+        speed: Infinity,
       });
       continue;
     }
@@ -6564,6 +6577,8 @@ function lmRenderRoutes() {
         opacity: 0.85,
         popup,
         sig: lmShapeSig(latlngs),
+        priority: LM_SEG_PRIORITY[cls] ?? 0,
+        speed: (seg.currentSpeed != null ? seg.currentSpeed : Infinity),
       });
     }
   }
@@ -6606,6 +6621,18 @@ function lmRenderRoutes() {
       lmRouteLayers.delete(key);
     }
   }
+
+  // Prioritera vid överlapp: rita långsammast/värst sist så att de hamnar överst.
+  // Sortera stigande på priority, sekundärt fallande på hastighet (låg fart vinner).
+  const ordered = desired.slice().sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    return b.speed - a.speed; // lägre fart → senare i listan → överst
+  });
+  for (const d of ordered) {
+    const entry = lmRouteLayers.get(d.key);
+    if (entry && entry.layer.bringToFront) entry.layer.bringToFront();
+  }
+
 
   // Visa/dölj lagret baserat på toggle-state
   if (!lmLayerVisible.routes) {
