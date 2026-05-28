@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trafikläge – Regiondashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :focus-visible{outline:2px solid #1AADEB;outline-offset:2px;}
@@ -1542,6 +1544,93 @@ html,body{
   box-shadow:0 12px 32px -8px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) !important;
   backdrop-filter:blur(10px);
 }
+
+/* ══ LIVE MAP ══ */
+#tab-livemap { position:relative; }
+#livemap-container {
+  flex:1; min-height:0; position:relative;
+  display:flex; flex-direction:column;
+}
+#livemap {
+  flex:1; min-height:0;
+  /* Leaflet behöver en explicit höjd — vi säter den med JS men detta är fallback */
+  height:100%;
+}
+/* Legend */
+#livemap-legend {
+  position:absolute; bottom:24px; left:12px; z-index:900;
+  background:rgba(10,10,10,0.92);
+  border:1px solid #2a2a2a;
+  border-radius:10px;
+  padding:10px 14px 12px;
+  min-width:170px;
+  backdrop-filter:blur(6px);
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+  user-select:none;
+}
+#livemap-legend h3 {
+  font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+  color:#888; margin:0 0 10px; font-weight:600;
+}
+.lm-layer-row {
+  display:flex; align-items:center; gap:8px;
+  margin-bottom:7px; cursor:pointer;
+}
+.lm-layer-row:last-child { margin-bottom:0; }
+.lm-layer-check {
+  width:14px; height:14px; border-radius:3px;
+  border:1px solid #333; background:#1a1a1a;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  transition:background 0.15s, border-color 0.15s;
+}
+.lm-layer-row.active .lm-layer-check { background:#009FE3; border-color:#009FE3; }
+.lm-layer-row.active .lm-layer-check::after {
+  content:''; display:block; width:8px; height:8px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.5l2.5 2.5 4.5-5' stroke='white' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.lm-layer-icon {
+  width:14px; height:14px; border-radius:50%; flex-shrink:0;
+}
+.lm-layer-label { font-size:12px; color:#ccc; }
+/* Färgskala i legenden */
+.lm-seg-scale {
+  display:flex; gap:2px; margin-top:10px; padding-top:10px;
+  border-top:1px solid #1e1e1e;
+}
+.lm-seg-swatch {
+  flex:1; height:6px; border-radius:2px;
+}
+.lm-seg-labels {
+  display:flex; justify-content:space-between;
+  margin-top:3px; font-size:9px; color:#666; letter-spacing:0.04em;
+}
+/* Live-badge på kartan */
+#livemap-livebadge {
+  position:absolute; top:10px; right:10px; z-index:900;
+  display:flex; align-items:center; gap:6px;
+  background:rgba(10,10,10,0.88); border:1px solid rgba(46,204,113,0.3);
+  border-radius:20px; padding:4px 10px;
+  font-size:10px; color:#2ecc71; letter-spacing:0.08em; text-transform:uppercase;
+  backdrop-filter:blur(4px);
+}
+#livemap-livebadge .lm-dot {
+  width:6px; height:6px; background:#2ecc71; border-radius:50%;
+  animation:tt-pulse 2s infinite;
+}
+/* Tile attribution – flytta ner på mobil */
+.leaflet-control-attribution { font-size:9px !important; }
+/* Popup-styling */
+.lm-popup .leaflet-popup-content-wrapper {
+  background:#111318; border:1px solid #2a2a2a;
+  border-radius:8px; color:#ccc; font-size:12px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+  padding:0;
+}
+.lm-popup .leaflet-popup-content { margin:0; padding:10px 13px; }
+.lm-popup .leaflet-popup-tip-container { display:none; }
+.lm-popup .leaflet-popup-close-button { color:#888 !important; top:6px !important; right:8px !important; }
+.lm-popup-title { font-weight:600; color:#e0e0e0; margin-bottom:4px; }
+.lm-popup-sub   { color:#888; font-size:11px; }
 </style>
 </head>
 <body>
@@ -1559,6 +1648,7 @@ html,body{
       <div class="tab" data-tab="storningar">Störningslista</div>
       <div class="tab" data-tab="mcs">MCS</div>
       <div class="tab" data-tab="tomtom">Restid</div>
+      <div class="tab" data-tab="livemap">Live Map</div>
       <div class="tab" data-tab="kollektivtrafik">Kollektivtrafik</div>
       <div class="tab" data-tab="vadervarningar">Vädervarningar</div>
       <div class="tab" data-tab="forklaring">Förklaring</div>
@@ -1782,6 +1872,48 @@ html,body{
       <div class="mcs-chart-wrap">
         <div class="mcs-chart-title">Medianhastighet Stockholm – senaste 20 min</div>
         <svg class="mcs-chart-svg" id="mcs-chart-sthlm" viewBox="0 0 600 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Live Map -->
+  <div class="tab-content" id="tab-livemap">
+    <div id="livemap-container">
+      <div id="livemap"></div>
+      <div id="livemap-livebadge"><div class="lm-dot"></div>Realtid</div>
+      <div id="livemap-legend">
+        <h3>Lager</h3>
+        <div class="lm-layer-row active" id="lm-row-routes" onclick="lmToggleLayer('routes')">
+          <div class="lm-layer-check"></div>
+          <div class="lm-layer-icon" style="background:linear-gradient(90deg,#4a7c59,#f39c12,#e74c3c);border-radius:3px;height:5px;width:14px;margin-top:0"></div>
+          <span class="lm-layer-label">Restidsrutter</span>
+        </div>
+        <div class="lm-layer-row active" id="lm-row-incidents" onclick="lmToggleLayer('incidents')">
+          <div class="lm-layer-check"></div>
+          <div class="lm-layer-icon" style="background:#e74c3c"></div>
+          <span class="lm-layer-label">Olyckor</span>
+        </div>
+        <div class="lm-layer-row active" id="lm-row-storningar" onclick="lmToggleLayer('storningar')">
+          <div class="lm-layer-check"></div>
+          <div class="lm-layer-icon" style="background:#f39c12"></div>
+          <span class="lm-layer-label">Incidenter</span>
+        </div>
+        <div class="lm-layer-row active" id="lm-row-vagarbeten" onclick="lmToggleLayer('vagarbeten')">
+          <div class="lm-layer-check"></div>
+          <div class="lm-layer-icon" style="background:#009FE3"></div>
+          <span class="lm-layer-label">Vägarbeten</span>
+        </div>
+        <div class="lm-seg-scale">
+          <div class="lm-seg-swatch" style="background:#4a7c59"></div>
+          <div class="lm-seg-swatch" style="background:#5e7a3a"></div>
+          <div class="lm-seg-swatch" style="background:#f39c12"></div>
+          <div class="lm-seg-swatch" style="background:#e74c3c"></div>
+          <div class="lm-seg-swatch" style="background:#5a6070"></div>
+        </div>
+        <div class="lm-seg-labels">
+          <span>Fri</span><span>Långsam</span><span>Stoppad</span>
+        </div>
       </div>
     </div>
   </div>
@@ -2924,6 +3056,10 @@ setTimeout(() => {
  * Anropas av fetchSMHI() och fetchTPData() efter lyckad hämtning.
  */
 function updateOverview() {
+  // Uppdatera Live Map-markörer om kartan är synlig
+  if (lmMap && document.getElementById('tab-livemap')?.classList.contains('active')) {
+    lmRenderMarkers();
+  }
   const LEVEL_RANK = { RED:4, ORANGE:3, YELLOW:2, MESSAGE:1 };
   const RANK_LEVEL = { 4:'red', 3:'orange', 2:'yellow', 1:'gray', 0:'none' };
 
@@ -5941,6 +6077,8 @@ async function ttLoadRoutes() {
     const data = await res.json();
     ttState.routes = Array.isArray(data) ? data : (data.routes || []);
     ttRenderRoutes(ttState.routes);
+    // Uppdatera Live Map om den är aktiv
+    if (document.getElementById('tab-livemap')?.classList.contains('active')) lmRefresh();
     ttUpdateLivedataWDI();
     if (document.getElementById('tab-oversikt')?.classList.contains('active')) buildAll();
     const updEl = document.getElementById('tt-lastUpdated');
@@ -6063,6 +6201,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     }
     if (target === 'kollektivtrafik') ktInit();
     if (target === 'vadervarningar') smhiInit();
+    if (target === 'livemap') lmInit();
   });
 });
 
@@ -6098,7 +6237,7 @@ Promise.allSettled([_smhiReady, _tpReady])
    Sparar bara parametrar relevanta för aktiv flik i URL:en.
 
    Stödda parametrar:
-     tab=oversikt|omrade|storningar|mcs|tomtom|kollektivtrafik|vadervarningar|forklaring
+     tab=oversikt|omrade|storningar|mcs|tomtom|livemap|kollektivtrafik|vadervarningar|forklaring
      region=norra|mellersta|vastra|ostra|sydostra|sodra          (tab=omrade)
      tc=TC+Nord|TC+Väst|TC+Öst|TC+Syd                           (tab=omrade)
      storning_region|storning_tc|storning_county                 (tab=storningar)
@@ -6202,6 +6341,192 @@ function deepLinkRead() {
     deepLinkWrite();
   };
 })();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE MAP
+   Leaflet-karta med OSM-bakgrund, restidsrutter, olyckor,
+   incidenter och vägarbeten.
+   ═══════════════════════════════════════════════════════════════ */
+
+let lmMap       = null;
+let lmInitialized = false;
+
+// Lager-state
+const lmLayerVisible = { routes: true, incidents: true, storningar: true, vagarbeten: true };
+
+// Leaflet-lagergrupper (skapas vid init)
+const lmGroups = { routes: null, incidents: null, storningar: null, vagarbeten: null };
+
+// Segment-färger (matchar tt-seg-* CSS)
+const LM_SEG_COLORS = {
+  'tt-seg-free':   '#4a7c59',
+  'tt-seg-ok':     '#5e7a3a',
+  'tt-seg-slow':   '#f39c12',
+  'tt-seg-bad':    '#e74c3c',
+  'tt-seg-closed': '#5a6070',
+  'tt-seg-nodata': '#2a3040',
+};
+
+function lmInit() {
+  if (lmInitialized) { lmRefresh(); return; }
+  lmInitialized = true;
+
+  // Se till att TomTom/Restid-data laddas om det inte redan gjorts
+  ttInit();
+
+  lmMap = L.map('livemap', {
+    center: [62.5, 16.5],   // Sverige centrerat
+    zoom: 5,
+    zoomControl: true,
+    attributionControl: true,
+  });
+
+  // OSM-bakgrundskarta (mörkt tema via CartoDB Dark Matter)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(lmMap);
+
+  // Skapa lagergrupper
+  lmGroups.routes     = L.layerGroup().addTo(lmMap);
+  lmGroups.incidents  = L.layerGroup().addTo(lmMap);
+  lmGroups.storningar = L.layerGroup().addTo(lmMap);
+  lmGroups.vagarbeten = L.layerGroup().addTo(lmMap);
+
+  // Rendera direkt om data redan finns — men ge DOM 50ms att layoutas
+  setTimeout(() => {
+    lmMap.invalidateSize();
+    lmRefresh();
+  }, 60);
+
+  // Återrendera vid window resize
+  window.addEventListener('resize', () => {
+    if (lmMap) lmMap.invalidateSize();
+  });
+}
+
+function lmRefresh() {
+  if (!lmMap) return;
+  lmMap.invalidateSize();
+  lmRenderRoutes();
+  lmRenderMarkers();
+}
+
+// ── Restidsrutter ─────────────────────────────────────────────
+function lmRenderRoutes() {
+  lmGroups.routes.clearLayers();
+  if (!lmLayerVisible.routes) return;
+  if (!ttState.initialized || !ttState.routeShapeCache.size) return;
+
+  for (const [routeId, { pts }] of ttState.routeShapeCache) {
+    if (!pts || pts.length < 2) continue;
+    const segs = ttState.segmentsCache.get(routeId);
+    if (!segs || !segs.length) {
+      // Rita grå linje om inga segment-detaljer finns
+      const latlngs = pts.map(p => [p.lat, p.lon]);
+      L.polyline(latlngs, {
+        color: LM_SEG_COLORS['tt-seg-nodata'],
+        weight: 4, opacity: 0.7,
+      }).addTo(lmGroups.routes);
+      continue;
+    }
+
+    // Bygg kumulativ pts-karta (samma som ttBuildShapeCache)
+    const totalDist = pts[pts.length - 1].cum;
+
+    // Rita varje segment som en färgad polyline
+    for (const seg of segs) {
+      const cls = ttSegColor(seg.currentSpeed, seg.freeFlowSpeed);
+      const color = LM_SEG_COLORS[cls] || LM_SEG_COLORS['tt-seg-nodata'];
+
+      // Hitta koordinater som hör till detta segment via startPct/endPct
+      if (!seg.shape || seg.shape.length < 2) continue;
+      const latlngs = seg.shape.map(p => [p.latitude, p.longitude]);
+
+      const route = ttState.routes.find(r => r.routeId === routeId);
+      const name  = route ? (route.routeName || routeId) : routeId;
+      const ratio = seg.freeFlowSpeed > 0 ? (seg.currentSpeed / seg.freeFlowSpeed) : null;
+      const pct   = ratio != null ? Math.round(ratio * 100) : null;
+      const popup = `<div class="lm-popup-title">${name}</div>
+        <div class="lm-popup-sub">${seg.currentSpeed != null ? seg.currentSpeed + ' km/h' : '—'} / ${seg.freeFlowSpeed != null ? seg.freeFlowSpeed + ' km/h friflöde' : '—'}${pct != null ? ' (' + pct + '%)' : ''}</div>`;
+
+      L.polyline(latlngs, {
+        color, weight: 5, opacity: 0.85,
+      }).bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .addTo(lmGroups.routes);
+    }
+  }
+}
+
+// ── Markörer: olyckor, incidenter, vägarbeten ────────────────
+function lmMarkerIcon(color, symbol) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:24px;height:24px;border-radius:50%;
+      background:${color};border:2px solid rgba(255,255,255,0.3);
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;line-height:1;
+      box-shadow:0 2px 6px rgba(0,0,0,0.5);
+    ">${symbol}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -14],
+  });
+}
+
+function lmRenderMarkers() {
+  lmGroups.incidents.clearLayers();
+  lmGroups.storningar.clearLayers();
+  lmGroups.vagarbeten.clearLayers();
+
+  const icoOlycka   = lmMarkerIcon('#c0281a', '⚠');
+  const icoStorning = lmMarkerIcon('#c07010', '⚡');
+  const icoVagarbete = lmMarkerIcon('#0070a0', '🔧');
+
+  // Olyckor och incidenter från ttState.tvIncidents
+  for (const inc of ttState.tvIncidents) {
+    if (!inc.lat || !inc.lon) continue;
+    const isOlycka = (inc.code || '').toLowerCase().includes('olycka');
+    const popup = `<div class="lm-popup-title">${inc.code || 'Händelse'}</div>
+      <div class="lm-popup-sub">${inc.location || inc.message || '—'}</div>`;
+
+    if (isOlycka) {
+      if (!lmLayerVisible.incidents) continue;
+      L.marker([inc.lat, inc.lon], { icon: icoOlycka })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .addTo(lmGroups.incidents);
+    } else {
+      if (!lmLayerVisible.storningar) continue;
+      L.marker([inc.lat, inc.lon], { icon: icoStorning })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .addTo(lmGroups.storningar);
+    }
+  }
+
+  // Vägarbeten
+  if (lmLayerVisible.vagarbeten) {
+    for (const va of ttState.tvVagarbeten) {
+      if (!va.lat || !va.lon) continue;
+      const popup = `<div class="lm-popup-title">${va.code || 'Vägarbete'}</div>
+        <div class="lm-popup-sub">${va.location || va.message || '—'}${va.roadNumber ? ' · Väg ' + va.roadNumber : ''}</div>`;
+      L.marker([va.lat, va.lon], { icon: icoVagarbete })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .addTo(lmGroups.vagarbeten);
+    }
+  }
+}
+
+// ── Lager-toggle ──────────────────────────────────────────────
+function lmToggleLayer(key) {
+  lmLayerVisible[key] = !lmLayerVisible[key];
+  const row = document.getElementById('lm-row-' + key);
+  if (row) row.classList.toggle('active', lmLayerVisible[key]);
+  if (key === 'routes') lmRenderRoutes();
+  else lmRenderMarkers();
+}
 
 deepLinkRead();
 
