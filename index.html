@@ -6129,15 +6129,20 @@ async function ttLoadRoutes() {
   }
   const btn = document.getElementById('tt-refreshBtn');
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
-  ttState.routeShapeCache.clear();
-  ttState.routeLanCache.clear();
-  ttState.segmentsCache.clear();
+  // OBS: Töm INTE caches här — det skulle göra Live Map svart i 3–5 sek
+  // medan ttFetchDetails kör. Nya data skriver över per routeId, och
+  // bortplockade rutter städas bort efteråt (se nedan).
   ttSegBarState.clear();
   try {
     const res = await fetch(`${TT_BASE_URL}/routes`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     ttState.routes = Array.isArray(data) ? data : (data.routes || []);
+    // Städa cache-poster för routeIds som inte längre finns i nya datan
+    const _liveIds = new Set(ttState.routes.map(r => r.routeId));
+    for (const m of [ttState.routeShapeCache, ttState.routeLanCache, ttState.segmentsCache]) {
+      for (const k of m.keys()) if (!_liveIds.has(k)) m.delete(k);
+    }
     ttRenderRoutes(ttState.routes);
     // Uppdatera Live Map om den är aktiv
     if (document.getElementById('tab-livemap')?.classList.contains('active')) lmRefresh();
