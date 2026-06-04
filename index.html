@@ -1683,8 +1683,11 @@ html,body{
 .lm-popup .leaflet-popup-content { margin:0; padding:10px 13px; }
 .lm-popup .leaflet-popup-tip-container { display:none; }
 .lm-popup .leaflet-popup-close-button { color:#888 !important; top:6px !important; right:8px !important; }
-.lm-popup-title { font-weight:600; color:#e0e0e0; margin-bottom:4px; }
-.lm-popup-sub   { color:#888; font-size:11px; }
+.lm-popup-title { font-weight:600; font-size:12px; color:#e0e0e0; margin-bottom:3px; line-height:1.3; }
+.lm-popup-sub   { color:#777; font-size:11px; margin-bottom:7px; line-height:1.4; }
+.lm-popup-grid  { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; }
+.lm-popup-key   { font-size:10px; letter-spacing:0.07em; text-transform:uppercase; color:#555; white-space:nowrap; padding-top:1px; }
+.lm-popup-val   { font-size:11px; color:#bbb; font-family:'DM Mono',ui-monospace,monospace; }
 </style>
 </head>
 <body>
@@ -1724,6 +1727,12 @@ html,body{
   <div class="tab-content" id="tab-omrade">
     <!-- Toolbar: filter -->
     <div class="omr-toolbar">
+      <div class="omr-filter-group">
+        <div class="omr-pills">
+          <button class="omr-pill" onclick="omrSelect('sweden','sweden',this)"><svg width="16" height="11" viewBox="0 0 16 11" style="display:inline-block;vertical-align:middle;margin-right:5px;border-radius:1px" xmlns="http://www.w3.org/2000/svg"><rect width="16" height="11" fill="#006AA7"/><rect y="4" width="16" height="3" fill="#FECC02"/><rect x="5" width="3" height="11" fill="#FECC02"/></svg></button>
+        </div>
+      </div>
+      <div class="omr-filter-divider"></div>
       <div class="omr-filter-group">
         <span class="omr-filter-label">Region</span>
         <div class="omr-pills" id="omr-region-pills">
@@ -2779,7 +2788,9 @@ function buildIndicatorList(cfg, data) {
     { type:'count',   label:'Incidenter', data:{ value: data.storningar, redMax: CONFIG.storningarRedMax } },
     { type:'trafik',  label:'Trafikpåv.', data:{ value: data.trafik,     redMax: CONFIG.trafikRedMax } },
     { sep: 'Trafiktillstånd' },
-    { type:'vaglag',  label:'Väglag',     data:{ value: data.vaglag } },
+    cfg.swedenLevel
+      ? { type:'tbd', label:'TBD', data:{} }
+      : { type:'vaglag',  label:'Väglag',     data:{ value: data.vaglag } },
     { type:'tomtom',  label:'Restid',     data:{ value: data.tomtom } },
     cfg.harWaze
       ? { type:'waze',     label:'Waze',       data:{ value: data.waze, wazeTs: data.wazeTs } }
@@ -3997,6 +4008,7 @@ async function fetchSMHI() {
 
     for (const event of events) {
       const eventCode = event.event?.code || event.eventCode || '—';
+      if (eventCode === 'WATER_SHORTAGE') continue;
       for (const wa of (event.warningAreas || [])) {
         const level    = wa.warningLevel?.code || 'MESSAGE';
         const affected = wa.affectedAreas || [];
@@ -4136,7 +4148,9 @@ const MCS_TCS     = new Set(['TC Väst','TC Öst']);
 function omrResolve(type, id) {
   // ── Regioner ──────────────────────────────────────────────────────────
   let regionIds;
-  if (type === 'region') {
+  if (type === 'sweden') {
+    regionIds = CONFIG.regioner.map(r => r.id);
+  } else if (type === 'region') {
     regionIds = [id];
   } else {
     // Hitta alla länsnummer för detta TC, ta unika regioner
@@ -4194,15 +4208,15 @@ function omrResolve(type, id) {
   //    Region-filter: nos.some(n => COUNTY_AREA[n] === regionId).
   if (tpData.length > 0) {
     hasData = true;
-    const filteredRows = tpData.filter(({dev}) => {
-      if (type === 'tc') {
-        // Samma logik som renderTPTable: TC_MAP[nos[0]]
-        return getTC(dev.CountyNo) === id;
-      } else {
-        // Region: minst ett länsnummer matchar regionen
-        return toCountyNos(dev.CountyNo).some(n => COUNTY_AREA[n] === id);
-      }
-    });
+    const filteredRows = type === 'sweden'
+      ? tpData
+      : tpData.filter(({dev}) => {
+          if (type === 'tc') {
+            return getTC(dev.CountyNo) === id;
+          } else {
+            return toCountyNos(dev.CountyNo).some(n => COUNTY_AREA[n] === id);
+          }
+        });
     olyckor    = filteredRows.filter(r => (r.dev.MessageType||'').toLowerCase() === 'olycka').length;
     storningar = filteredRows.filter(r => (r.dev.MessageType||'').toLowerCase() !== 'olycka').length;
   }
@@ -4218,7 +4232,7 @@ function omrResolve(type, id) {
     koll:       kollCnt      > 0 ? Math.round((kollSum/kollCnt)*10)/10           : null,
     mcsTrend:   mcsTrendCnt  > 0 ? Math.round((mcsTrendSum/mcsTrendCnt)*10)/10   : null,
     vagarbeten,
-    tomtom:     ttState.initialized ? ttCalcRegionWDI(regionIds) : null,
+    tomtom:     ttState.initialized ? ttCalcRegionWDI(type === 'sweden' ? null : regionIds) : null,
   };
 
   // ── Cfg (aggregerade förmågor) ────────────────────────────────────────
@@ -4226,10 +4240,17 @@ function omrResolve(type, id) {
   const cfg = {
     id,
     namn: id,
-    harWaze: cfgs.some(c => c.harWaze),
-    harKoll: cfgs.some(c => c.harKoll),
-    harMCS:  cfgs.some(c => c.harMCS),
+    // Sverige-nivå: väglag/waze/koll/mcs kan inte aggregeras meningsfullt → TBD
+    harWaze: type === 'sweden' ? false : cfgs.some(c => c.harWaze),
+    harKoll: type === 'sweden' ? false : cfgs.some(c => c.harKoll),
+    harMCS:  type === 'sweden' ? false : cfgs.some(c => c.harMCS),
+    swedenLevel: type === 'sweden',
   };
+
+  // Sverige: nolla ut väglag (meningslöst medelvärde) så att cirkeln visar TBD-vy
+  if (type === 'sweden') {
+    data.vaglag = null;
+  }
 
   return { regionIds, data, cfg };
 }
@@ -4258,27 +4279,29 @@ function omrRender() {
   sec.style.display = 'flex';
 
   // Titel
-  const typeLabel = type === 'tc' ? '' : 'Region ';
-  document.getElementById('omr-kpi-title').textContent = typeLabel + id;
-
-  // Länslista som subtitle
-  let counties;
-  if (type === 'tc') {
-    // Hämta länsnummer direkt från TC_MAP
-    counties = Object.entries(TC_MAP)
+  let titleText, subtitleText;
+  if (type === 'sweden') {
+    titleText    = 'Sverige';
+    subtitleText = Object.values(COUNTY).sort().join(' · ');
+  } else if (type === 'tc') {
+    titleText = id;
+    subtitleText = Object.entries(TC_MAP)
       .filter(([, tc]) => tc === id)
       .map(([no]) => COUNTY[Number(no)])
       .filter(Boolean)
-      .sort();
+      .sort()
+      .join(' · ');
   } else {
-    // Region: hämta länsnummer från COUNTY_AREA
-    counties = Object.entries(COUNTY_AREA)
+    titleText = 'Region ' + id;
+    subtitleText = Object.entries(COUNTY_AREA)
       .filter(([, area]) => area === id)
       .map(([no]) => COUNTY[Number(no)])
       .filter(Boolean)
-      .sort();
+      .sort()
+      .join(' · ');
   }
-  document.getElementById('omr-kpi-subtitle').textContent = counties.join(' · ');
+  document.getElementById('omr-kpi-title').textContent    = titleText;
+  document.getElementById('omr-kpi-subtitle').textContent = subtitleText;
 
   // Berika data med vägarbeten (räknas direkt med TC_MAP/COUNTY_AREA)
   data.vagarbeten = countVagarbeten(type, id);
@@ -4286,11 +4309,24 @@ function omrRender() {
   // Bygg KPI-remsan — rAF säkerställer att strip har korrekt bredd
   requestAnimationFrame(() => buildOmrKpiStrip(cfg, data));
 
-  // Bygg topp-5 lista
+  // Sverige-nivå: dölj restidsrutter, ge topplistan full plats med 10 händelser
+  const ttWrap   = document.querySelector('.omr-tt-wrap');
+  const top5Wrap = document.querySelector('.omr-top5-wrap');
+  if (type === 'sweden') {
+    if (ttWrap)   { ttWrap.style.display   = 'none'; }
+    if (top5Wrap) { top5Wrap.style.flex    = '1'; top5Wrap.style.maxHeight = 'none'; }
+    CONFIG.omrTopN = 10;
+  } else {
+    if (ttWrap)   { ttWrap.style.display   = ''; }
+    if (top5Wrap) { top5Wrap.style.flex    = ''; top5Wrap.style.maxHeight = ''; }
+    CONFIG.omrTopN = 5;
+  }
+
+  // Bygg topp-N lista
   buildOmrTop5(type, id);
 
-  // Bygg restidsruttfältet
-  buildOmrTomTom(type, id);
+  // Bygg restidsruttfältet (hoppas över om Sverige)
+  if (type !== 'sweden') buildOmrTomTom(type, id);
 }
 
 function buildOmrKpiStrip(cfg, data) {
@@ -4526,6 +4562,7 @@ function ttLanToArea(lanCode) {
  * för att slippa upprepa samma lookup-logik.
  */
 function getCountySet(type, id) {
+  if (type === 'sweden') return new Set(Object.keys(COUNTY_AREA).map(Number));
   const entries = type === 'tc'
     ? Object.entries(TC_MAP).filter(([, tc]) => tc === id)
     : Object.entries(COUNTY_AREA).filter(([, area]) => area === id);
@@ -4538,6 +4575,7 @@ function getCountySet(type, id) {
  */
 function countVagarbeten(type, id) {
   if (!ttState.tvVagarbeten.length) return 0;
+  if (type === 'sweden') return ttState.tvVagarbeten.length;
   const countyNos = getCountySet(type, id);
   return ttState.tvVagarbeten.filter(va =>
     va.countyNos.some(n => countyNos.has(parseInt(n, 10)))
@@ -4551,13 +4589,16 @@ function countVagarbeten(type, id) {
  * Returnerar procent (0–∞) eller null om ingen data finns.
  */
 function ttCalcRegionWDI(regionIds) {
-  const regionSet = new Set(regionIds);
+  // null = alla regioner (Sverige-nivå)
+  const regionSet = regionIds ? new Set(regionIds) : null;
   let sumWR = 0, sumW = 0;
   for (const r of ttState.routes) {
     if (r.routeStatus !== 'ACTIVE' || !r.travelTime || !r.typicalTravelTime || !r.routeLength) continue;
-    const code = ttGetLanCode(r.routeName);
-    const area = ttLanToArea(code);
-    if (!area || !regionSet.has(area)) continue;
+    if (regionSet !== null) {
+      const code = ttGetLanCode(r.routeName);
+      const area = ttLanToArea(code);
+      if (!area || !regionSet.has(area)) continue;
+    }
     sumWR += (r.travelTime / r.typicalTravelTime - 1) * r.routeLength;
     sumW  += r.routeLength;
   }
@@ -4594,11 +4635,14 @@ function buildOmrTomTom(type, id) {
   }
 
   // Filtrera rutter vars länsnummer (från ruttnamnet) finns i countyNos
-  const routes = ttState.routes.filter(r => {
-    const code = ttGetLanCode(r.routeName);
-    if (!code) return false;
-    return countyNos.has(parseInt(code, 10));
-  });
+  // Sverige-nivå: visa alla rutter
+  const routes = type === 'sweden'
+    ? [...ttState.routes]
+    : ttState.routes.filter(r => {
+        const code = ttGetLanCode(r.routeName);
+        if (!code) return false;
+        return countyNos.has(parseInt(code, 10));
+      });
 
   if (!routes.length) {
     el.innerHTML = '<div class="omr-tt-empty">Inga restidsrutter för detta område</div>';
@@ -6058,12 +6102,16 @@ async function ttFetchTrafikverket() {
         const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
         if (m && String(dev.ManagedCause).toLowerCase() === 'true') ttState.tvIncidents.push({
           lon: +m[1], lat: +m[2],
+          sitId: sit.Id || null,
           code: dev.MessageCode || '',
           message: dev.Message || '',
           location: dev.LocationDescriptor || '',
           direction: dev.AffectedDirectionValue || 'BothDirections',
           lineVec: ttParseLineVec(dev.Geometry?.Line?.WGS84),
           roadBlocked,
+          startTime: dev.StartTime || null,
+          endTime: dev.EndTime || null,
+          numberOfLanesRestricted: dev.NumberOfLanesRestricted ?? null,
           countyNos: (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : []).map(v => String(v).split(',')[0]).filter(Boolean)
         });
       }
@@ -6422,7 +6470,7 @@ let lmMap       = null;
 let lmInitialized = false;
 
 // Lager-state
-const lmLayerVisible = { routes: true, incidents: true, storningar: true, vagarbeten: true };
+const lmLayerVisible = { routes: true, incidents: true, storningar: true, vagarbeten: false };
 
 // Leaflet-lagergrupper (skapas vid init)
 const lmGroups = { routes: null, incidents: null, storningar: null, vagarbeten: null };
@@ -6480,7 +6528,9 @@ function lmInit() {
   lmGroups.routes     = L.layerGroup().addTo(lmMap);
   lmGroups.incidents  = L.layerGroup().addTo(lmMap);
   lmGroups.storningar = L.layerGroup().addTo(lmMap);
-  lmGroups.vagarbeten = L.layerGroup().addTo(lmMap);
+  lmGroups.vagarbeten = L.layerGroup(); // ej tillagd på kartan per default
+  const _vaRow = document.getElementById('lm-row-vagarbeten');
+  if (_vaRow) _vaRow.classList.remove('active');
 
   // Rendera direkt om data redan finns — ge DOM tid att layoutas (extra marginal för mobil)
   setTimeout(() => {
@@ -6672,20 +6722,63 @@ function lmRenderMarkers() {
   const icoStorning  = lmMarkerIcon('#c07010', '⚡');
   const icoVagarbete = lmMarkerIcon('#0070a0', '🔧');
 
+  // Bygg snabb lookup: sitId → tpData-rad (för adt, laneCount, impact)
+  const tpById = new Map(tpData.map(r => [r.id, r]));
+
   // Olyckor och incidenter från ttState.tvIncidents
   for (const inc of ttState.tvIncidents) {
     if (!inc.lat || !inc.lon) continue;
     const isOlycka = (inc.code || '').toLowerCase().includes('olycka');
+
+    // Slå upp mot tpData för att hämta adt + laneCount
+    const tpRow = inc.sitId ? tpById.get(inc.sitId) : null;
+
+    // Ålder
+    const ageObj = fmtAge(inc.startTime);
+    const ageStr = ageObj ? ageObj.text : '—';
+
+    // Tid kvar
+    const remObj = fmtRemaining(inc.endTime);
+    const remStr = remObj.text;
+
+    // Körfält (påverkade / totalt)
+    let lanesStr = '—';
+    if (inc.roadBlocked) {
+      lanesStr = 'Avstängd';
+    } else if (tpRow) {
+      const restricted = tpRow.dev?.NumberOfLanesRestricted ?? null;
+      const total      = tpRow.laneCount ?? null;
+      if (total != null) lanesStr = (restricted ?? 0) + ' / ' + total;
+      else if (restricted != null) lanesStr = restricted + ' påverkade';
+    } else if (inc.numberOfLanesRestricted != null) {
+      lanesStr = inc.numberOfLanesRestricted > 0 ? inc.numberOfLanesRestricted + ' påverkade' : '—';
+    }
+
+    // Trafikpåverkan via calcImpact (kräver adt + endTime)
+    let impStr = '—';
+    if (tpRow && tpRow.adt != null) {
+      const pct = tpRow.roadBlocked ? 0 : getCapacity(tpRow.dev?.NumberOfLanesRestricted, tpRow.laneCount);
+      const impVal = calcImpact(pct, inc.endTime, tpRow.adt);
+      const impObj = fmtImpact(impVal);
+      if (impObj.text !== '—') impStr = impObj.text + ' fordon';
+    }
+
     const popup = `<div class="lm-popup-title">${inc.code || 'Händelse'}</div>
-      <div class="lm-popup-sub">${inc.location || inc.message || '—'}</div>`;
+      <div class="lm-popup-sub">${inc.location || inc.message || '—'}</div>
+      <div class="lm-popup-grid">
+        <span class="lm-popup-key">Ålder</span><span class="lm-popup-val">${ageStr}</span>
+        <span class="lm-popup-key">Tid kvar</span><span class="lm-popup-val">${remStr}</span>
+        <span class="lm-popup-key">Körfält</span><span class="lm-popup-val">${lanesStr}</span>
+        <span class="lm-popup-key">Trafikpåv.</span><span class="lm-popup-val">${impStr}</span>
+      </div>`;
 
     if (isOlycka) {
       L.marker([inc.lat, inc.lon], { icon: icoOlycka })
-        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 280 })
         .addTo(lmGroups.incidents);
     } else {
       L.marker([inc.lat, inc.lon], { icon: icoStorning })
-        .bindPopup(popup, { className: 'lm-popup', maxWidth: 260 })
+        .bindPopup(popup, { className: 'lm-popup', maxWidth: 280 })
         .addTo(lmGroups.storningar);
     }
   }
