@@ -2935,12 +2935,10 @@ const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.
 let _flowAbort = null;
 let flowInitialized = false;
 
-// Ladda historik från KV vid start – fyller speedHistory med sparade punkter
+// Ladda historik från localStorage vid start – fyller speedHistory med sparade punkter
 async function loadSpeedHistory() {
   try {
-    const res = await fetch(`${PROXY_BASE}/history`);
-    if (!res.ok) return;
-    const saved = await res.json();
+    const saved = JSON.parse(localStorage.getItem('speedHistory') || '{}');
     const now = Date.now();
     const cutoff = now - SPEED_HIST_MAX;
     for (const key of ['vastra', 'ostra']) {
@@ -2959,14 +2957,13 @@ async function loadSpeedHistory() {
   }
 }
 
-// Spara historik till KV efter varje fetch – fire-and-forget
+// Spara historik till localStorage efter varje fetch
 function saveSpeedHistory() {
-  const payload = JSON.stringify(speedHistory);
-  fetch(`${PROXY_BASE}/history`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: payload,
-  }).catch(() => {});
+  try {
+    localStorage.setItem('speedHistory', JSON.stringify(speedHistory));
+  } catch (e) {
+    console.warn('Kunde inte spara speedHistory till localStorage:', e);
+  }
 }
 
 function flowInit() {
