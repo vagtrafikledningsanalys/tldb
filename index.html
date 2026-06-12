@@ -2937,7 +2937,7 @@ let flowInitialized = false;
 
 async function testBaselineFetch() {
   try {
-    const res = await fetch(`${PROXY}/baseline`);
+    const res = await fetch(`${PROXY_BASE}/baseline`);
     const upstreamStatus = res.headers.get('X-Upstream-Status');
     const upstreamCT = res.headers.get('X-Upstream-Content-Type');
     const text = await res.text();
