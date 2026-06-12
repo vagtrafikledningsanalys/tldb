@@ -2935,6 +2935,23 @@ const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.
 let _flowAbort = null;
 let flowInitialized = false;
 
+async function testBaselineFetch() {
+  try {
+    const res = await fetch(`${PROXY}/baseline`);
+    const upstreamStatus = res.headers.get('X-Upstream-Status');
+    const upstreamCT = res.headers.get('X-Upstream-Content-Type');
+    const text = await res.text();
+    console.log('[Baseline test] HTTP:', res.status);
+    console.log('[Baseline test] Upstream status:', upstreamStatus);
+    console.log('[Baseline test] Upstream content-type:', upstreamCT);
+    console.log('[Baseline test] Första 500 tecken:', text.slice(0, 500));
+  } catch (e) {
+    console.error('[Baseline test] Fel:', e);
+  }
+}
+testBaselineFetch();
+
+
 // Ladda historik från localStorage vid start – fyller speedHistory med sparade punkter
 async function loadSpeedHistory() {
   try {
