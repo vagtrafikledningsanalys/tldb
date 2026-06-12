@@ -2512,11 +2512,14 @@ function makeSVG(type, data, sz) {
   /* ── 2. Olyckor / 3. Störningar (räknare med färgskala) ── */
   if (type === 'count') {
     if (data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      // Grå ring om baseline ej laddat, annars standard tom-ring
+      const noDataCol = (baselineData === null) ? '#555' : '#252525';
+      svg.appendChild(circle('#1a1a1a', noDataCol, '1'));
       svg.appendChild(text('…', fs*0.8, '#333'));
       return svg;
     }
-    const col = scaleColor(data.value, data.redMax);
+    // Använd baseline-färg om tillgänglig, annars scaleColor med hårdkodat redMax
+    const col = data.baselineCol ?? scaleColor(data.value, data.redMax);
     svg.appendChild(circle(col.fill, col.stroke,'1.5'));
     const n = fmtNum(data.value);
     const f2 = n.length > 4 ? fsXS : n.length > 3 ? fsS : fs;
@@ -2784,8 +2787,8 @@ function buildIndicatorList(cfg, data) {
   return [
     { sep: 'Väder & händelser' },
     { type:'smhi',    label:'SMHI',       data:{ level: data.smhi } },
-    { type:'count',   label:'Olyckor',    data:{ value: data.olyckor,    redMax: CONFIG.olyckorRedMax } },
-    { type:'count',   label:'Incidenter', data:{ value: data.storningar, redMax: CONFIG.storningarRedMax } },
+    { type:'count',   label:'Olyckor',    data:{ value: data.olyckor,    redMax: baselineRedMax('olyckor',    cfg._countySet), baselineCol: baselineColor(data.olyckor,    'olyckor',    cfg._countySet) } },
+    { type:'count',   label:'Incidenter', data:{ value: data.storningar, redMax: baselineRedMax('incidenter', cfg._countySet), baselineCol: baselineColor(data.storningar, 'incidenter', cfg._countySet) } },
     { type:'trafik',  label:'Trafikpåv.', data:{ value: data.trafik,     redMax: CONFIG.trafikRedMax } },
     { sep: 'Trafiktillstånd' },
     cfg.swedenLevel
@@ -2932,25 +2935,142 @@ const speedHistory = { vastra:[], ostra:[] };
 const speedHistoryStart = { vastra:null, ostra:null };
 const SPEED_HIST_MAX = 30 * 60_000;
 const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev';
-let _flowAbort = null;
-let flowInitialized = false;
 
-async function testBaselineFetch() {
+/* ═══════════════════════════════════════════════════════════════════
+   BASELINE – normalvärden per kvartsindex, län och helg/vardag
+   Källa: Google Sheets via Cloudflare Worker /baseline (CSV)
+
+   Struktur: baselineData[lan_nr][is_helg][kvartsindex] = { mean_olyckor, std_olyckor, mean_incidenter, std_incidenter }
+   ═══════════════════════════════════════════════════════════════════ */
+let baselineData = null;   // null = ej laddat, {} = laddat (kan vara tomt vid fel)
+
+function baselineCurrentSlot() {
+  const now  = new Date();
+  const h    = now.getHours();
+  const m    = now.getMinutes();
+  const dow  = now.getDay(); // 0=sön, 6=lör
+  const isHelg = (dow === 0 || dow === 6) ? 1 : 0;
+  const qi   = Math.floor((h * 60 + m) / 15);
+  return { isHelg, qi };
+}
+
+function parseBaselineCsv(csv) {
+  const result = {};
+  const lines  = csv.split('\n');
+  // Hitta header-rad (kan ha extra kolumner och metadata till höger)
+  let headerIdx = -1;
+  let colMap    = {};
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const cols = lines[i].split(',').map(s => s.replace(/"/g,'').trim().toLowerCase());
+    if (cols.includes('lan_nr') && cols.includes('kvartsindex')) {
+      headerIdx = i;
+      cols.forEach((c, idx) => { colMap[c] = idx; });
+      break;
+    }
+  }
+  if (headerIdx === -1) return result;
+
+  const get = (row, name) => {
+    const v = row[colMap[name]];
+    if (v === undefined || v === '') return NaN;
+    return parseFloat(String(v).replace(/"/g,'').replace(',','.'));
+  };
+
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!raw.trim()) continue;
+    // CSV-värden kan vara citerade med kommatecken inuti — enkel hantering
+    const row = raw.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g)
+                   ?.map(s => s.replace(/^"|"$/g,'')) ?? raw.split(',');
+
+    const lan   = parseInt(get(row, 'lan_nr'), 10);
+    const helg  = parseInt(get(row, 'is_helg'), 10);
+    const qi    = parseInt(get(row, 'kvartsindex'), 10);
+    if (isNaN(lan) || isNaN(helg) || isNaN(qi)) continue;
+
+    if (!result[lan])       result[lan]       = {};
+    if (!result[lan][helg]) result[lan][helg] = {};
+    result[lan][helg][qi] = {
+      mean_olyckor:     get(row, 'mean_olyckor'),
+      std_olyckor:      get(row, 'std_olyckor'),
+      mean_incidenter:  get(row, 'mean_incidenter'),
+      std_incidenter:   get(row, 'std_incidenter'),
+    };
+  }
+  return result;
+}
+
+async function loadBaseline() {
   try {
-    const res = await fetch(`${PROXY_BASE}/baseline`);
-    const upstreamStatus = res.headers.get('X-Upstream-Status');
-    const upstreamCT = res.headers.get('X-Upstream-Content-Type');
+    const res  = await fetch(`${PROXY_BASE}/baseline`);
     const text = await res.text();
-    console.log('[Baseline test] HTTP:', res.status);
-    console.log('[Baseline test] Upstream status:', upstreamStatus);
-    console.log('[Baseline test] Upstream content-type:', upstreamCT);
-    console.log('[Baseline test] Första 500 tecken:', text.slice(0, 500));
+    baselineData = parseBaselineCsv(text);
+    console.log('[Baseline] Laddat, antal län:', Object.keys(baselineData).length);
   } catch (e) {
-    console.error('[Baseline test] Fel:', e);
+    baselineData = {};
+    console.warn('[Baseline] Misslyckades:', e);
   }
 }
-testBaselineFetch();
 
+/**
+ * Beräknar aggregerat (mean, std) för ett urval länsnummer, typ och nuvarande slot.
+ * Metod A: mean_tot = Σ mean_i, std_tot = √(Σ std_i²)
+ * Returnerar null om baseline saknas eller inga matchande rader finns.
+ */
+function getBaselineNorm(type, countySet) {
+  if (!baselineData || Object.keys(baselineData).length === 0) return null;
+  const { isHelg, qi } = baselineCurrentSlot();
+  const field_mean = type === 'olyckor' ? 'mean_olyckor'    : 'mean_incidenter';
+  const field_std  = type === 'olyckor' ? 'std_olyckor'     : 'std_incidenter';
+
+  let sumMean = 0;
+  let sumVar  = 0;
+  let found   = 0;
+
+  for (const lan of countySet) {
+    const row = baselineData[lan]?.[isHelg]?.[qi];
+    if (!row) continue;
+    const m = row[field_mean];
+    const s = row[field_std];
+    if (isNaN(m) || isNaN(s)) continue;
+    sumMean += m;
+    sumVar  += s * s;
+    found++;
+  }
+  if (found === 0) return null;
+  return { mean: sumMean, std: Math.sqrt(sumVar) };
+}
+
+/**
+ * Returnerar dynamiskt redMax = mean + 4σ för ett urval.
+ * Fallback till CONFIG-värdet om baseline saknas.
+ */
+function baselineRedMax(type, countySet) {
+  const norm = getBaselineNorm(type, countySet);
+  if (!norm) return type === 'olyckor' ? CONFIG.olyckorRedMax : CONFIG.storningarRedMax;
+  return Math.max(norm.mean + 4 * norm.std, 1); // minst 1 för att undvika division med noll
+}
+
+/**
+ * Returnerar färg för ett värde relativt baseline.
+ * Grön vid ≤ mean+1σ, gradient mot röd vid mean+4σ.
+ * Om baseline ej laddat: grå ring (gradientColor med speciell signal).
+ */
+function baselineColor(value, type, countySet) {
+  if (value === null || value === undefined) return gradientColor(0);
+  const norm = getBaselineNorm(type, countySet);
+  if (!norm) {
+    // Baseline ej laddat – returnera grå (t=−1 som signal, hanteras nedan)
+    return { stroke: '#555', fill: '#1a1a1a' };
+  }
+  const lower = norm.mean + 1 * norm.std;
+  const upper = norm.mean + 4 * norm.std;
+  if (upper <= lower) return gradientColor(value > lower ? 1 : 0);
+  const t = Math.max(0, Math.min(1, (value - lower) / (upper - lower)));
+  return gradientColor(t);
+}
+let _flowAbort = null;
+let flowInitialized = false;
 
 // Ladda historik från localStorage vid start – fyller speedHistory med sparade punkter
 async function loadSpeedHistory() {
@@ -3235,7 +3355,11 @@ function buildAll() {
 
   CONFIG.regioner.forEach(regionCfg => {
     const data = Object.assign({}, DEFAULT_DATA[regionCfg.id] || {}, LIVEDATA[regionCfg.id] || {});
-    buildCard(dash, regionCfg, data, sz, titleFs, lblFs, cellGap);
+    // Lägg till _countySet för baseline-färgsättning
+    const cfgWithCounty = Object.assign({}, regionCfg, {
+      _countySet: getCountySet('region', regionCfg.id),
+    });
+    buildCard(dash, cfgWithCounty, data, sz, titleFs, lblFs, cellGap);
   });
 }
 
@@ -4259,6 +4383,8 @@ function omrResolve(type, id) {
     harKoll: type === 'sweden' ? false : cfgs.some(c => c.harKoll),
     harMCS:  type === 'sweden' ? false : cfgs.some(c => c.harMCS),
     swedenLevel: type === 'sweden',
+    // Länsnummer för baseline-aggregering
+    _countySet: getCountySet(type, id),
   };
 
   // Sverige: nolla ut väglag (meningslöst medelvärde) så att cirkeln visar TBD-vy
@@ -6356,6 +6482,7 @@ const _tpReady   = fetchTPData();
 ktInit();
 wazeInit();
 vaglagInit();
+loadBaseline();
 
 // Restid startar när de initiala datahämtningarna är klara – robustare än
 // hårdkodat setTimeout och startar så snart nätverket svarar.
