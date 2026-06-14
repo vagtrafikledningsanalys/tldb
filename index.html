@@ -3018,7 +3018,7 @@ const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.
    BASELINE – normalvärden per kvartsindex, län och helg/vardag
    Källa: Google Sheets via Cloudflare Worker /baseline (CSV)
 
-   Struktur: baselineData[lan_nr][is_helg][kvartsindex] = { mean_olyckor, std_olyckor, mean_incidenter, std_incidenter }
+   Struktur: baselineData[lan_nr][is_helg][kvartsindex] = { mean_olyckor, mean_incidenter, n_samples, k_p75/90/95/99_olyckor, k_p75/90/95/99_incidenter }
    ═══════════════════════════════════════════════════════════════════ */
 let baselineData = null;   // null = ej laddat, {} = laddat (kan vara tomt vid fel)
 
@@ -3069,11 +3069,17 @@ function parseBaselineCsv(csv) {
     if (!result[lan])       result[lan]       = {};
     if (!result[lan][helg]) result[lan][helg] = {};
     result[lan][helg][qi] = {
-      mean_olyckor:     get(row, 'mean_olyckor'),
-      std_olyckor:      get(row, 'std_olyckor'),
-      mean_incidenter:  get(row, 'mean_incidenter'),
-      std_incidenter:   get(row, 'std_incidenter'),
-      n_samples:        get(row, 'n_samples'),
+      mean_olyckor:       get(row, 'mean_olyckor'),
+      mean_incidenter:    get(row, 'mean_incidenter'),
+      n_samples:          get(row, 'n_samples'),
+      k_p75_olyckor:      get(row, 'k_p75_olyckor'),
+      k_p90_olyckor:      get(row, 'k_p90_olyckor'),
+      k_p95_olyckor:      get(row, 'k_p95_olyckor'),
+      k_p99_olyckor:      get(row, 'k_p99_olyckor'),
+      k_p75_incidenter:   get(row, 'k_p75_incidenter'),
+      k_p90_incidenter:   get(row, 'k_p90_incidenter'),
+      k_p95_incidenter:   get(row, 'k_p95_incidenter'),
+      k_p99_incidenter:   get(row, 'k_p99_incidenter'),
     };
   }
   return result;
@@ -3155,24 +3161,27 @@ function renderBaselineTab() {
     for (const n of countySet) s += (map[n] || 0);
     return s;
   }
+  // Tickvärden på gradienten: p75, p90, p95, p99 + ett "max"-värde ovanför p99
   function tickVals(norm) {
-    if (!norm) return [0,0,0,0,0];
-    return [0,1,2,3,4].map(k => Math.round(norm.mean + k * norm.std));
+    if (!norm) return ['–','–','–','–','–'];
+    return [0, norm.p75, norm.p90, norm.p95, norm.p99];
   }
+  // Placera strecket längs baren: p75=25%, p90=45%, p95=65%, p99=85%, >p99 → 85–97%
   function posOnBar(value, norm) {
     if (!norm) return 5;
-    const lo = norm.mean;
-    const hi = norm.mean + 4 * norm.std;
-    if (hi <= lo) return value > lo ? 97 : 5;
-    return Math.max(2, Math.min(97, ((value - lo) / (hi - lo)) * 100));
+    if (value <  norm.p75) return Math.max(2,  (value / Math.max(norm.p75, 1)) * 25);
+    if (value <  norm.p90) return 25 + ((value - norm.p75) / Math.max(norm.p90 - norm.p75, 1)) * 20;
+    if (value <  norm.p95) return 45 + ((value - norm.p90) / Math.max(norm.p95 - norm.p90, 1)) * 20;
+    if (value <= norm.p99) return 65 + ((value - norm.p95) / Math.max(norm.p99 - norm.p95, 1)) * 20;
+    return Math.min(97, 85 + ((value - norm.p99) / Math.max(norm.p99, 1)) * 12);
   }
   function valColor(value, norm) {
     if (!norm) return '#555';
-    const t = Math.max(0, Math.min(1, (value - (norm.mean + norm.std)) / (3 * norm.std)));
-    if (t <= 0)   return '#4caf50';
-    if (t < 0.33) return '#ffeb3b';
-    if (t < 0.66) return '#ff9800';
-    return '#f44336';
+    if (value <  norm.p75) return '#4caf50';
+    if (value <  norm.p90) return '#ffeb3b';
+    if (value <  norm.p95) return '#ff9800';
+    if (value <= norm.p99) return '#f44336';
+    return '#7f0000';
   }
 
   function metricHTML(label, value, norm) {
@@ -3251,71 +3260,72 @@ function renderBaselineTab() {
     <div class="bl-legend">
       <div class="bl-legend-title">Så läser du skalan</div>
       <div class="bl-legend-bar"></div>
-      <div class="bl-legend-ticks"><span>μ</span><span>+1σ</span><span>+2σ</span><span>+3σ</span><span>+4σ</span></div>
+      <div class="bl-legend-ticks"><span>0</span><span>p75</span><span>p90</span><span>p95</span><span>p99</span></div>
       <p class="bl-legend-note">
-        Strecket visar nuläget. Talen under gradienten är absoluta gränsvärden (antal händelser)
-        beräknade som μ+nσ för det aktuella kvartsindexet och dagstypen.
-        σ (standardavvikelse) mäter hur mycket antalet normalt varierar.
-        Grönt = normalt (≤ μ+1σ) · Gult = μ+2σ · Orange = μ+3σ · Rött = avvikande (≥ μ+4σ).
+        Strecket visar nuläget. Talen under gradienten är Poisson-trösklar — det antal händelser
+        som statistiskt sett inte överstigs i 75%, 90%, 95% respektive 99% av kvartsintervallen,
+        baserat på historiska medelvärden för aktuellt kvartsindex och dagstyp.
+        Grön &lt; p75 · Gul p75–p90 · Orange p90–p95 · Röd p95–p99 · Mörkröd &gt; p99.
       </p>
     </div>`;
 }
 
 /**
- * Beräknar aggregerat (mean, std) för ett urval länsnummer, typ och nuvarande slot.
- * Metod A: mean_tot = Σ mean_i, std_tot = √(Σ std_i²)
+ * Aggregerar Poisson-trösklar för ett urval länsnummer, typ och nuvarande slot.
+ * Summerar k-trösklarna över länen (additiv Poisson-egenskap).
  * Returnerar null om baseline saknas eller inga matchande rader finns.
  */
 function getBaselineNorm(type, countySet) {
   if (!baselineData || Object.keys(baselineData).length === 0) return null;
   const { isHelg, qi } = baselineCurrentSlot();
-  const field_mean = type === 'olyckor' ? 'mean_olyckor'    : 'mean_incidenter';
-  const field_std  = type === 'olyckor' ? 'std_olyckor'     : 'std_incidenter';
+  const prefix = type === 'olyckor' ? 'olyckor' : 'incidenter';
 
-  let sumMean = 0;
-  let sumVar  = 0;
-  let found   = 0;
+  let p75 = 0, p90 = 0, p95 = 0, p99 = 0;
+  let found = 0;
 
   for (const lan of countySet) {
     const row = baselineData[lan]?.[isHelg]?.[qi];
     if (!row) continue;
-    const m = row[field_mean];
-    const s = row[field_std];
-    if (isNaN(m) || isNaN(s)) continue;
-    sumMean += m;
-    sumVar  += s * s;
+    const v75 = row[`k_p75_${prefix}`];
+    const v90 = row[`k_p90_${prefix}`];
+    const v95 = row[`k_p95_${prefix}`];
+    const v99 = row[`k_p99_${prefix}`];
+    if (isNaN(v75) || isNaN(v90) || isNaN(v95) || isNaN(v99)) continue;
+    p75 += v75; p90 += v90; p95 += v95; p99 += v99;
     found++;
   }
   if (found === 0) return null;
-  return { mean: sumMean, std: Math.sqrt(sumVar) };
+  return { p75, p90, p95, p99 };
 }
 
 /**
- * Returnerar dynamiskt redMax = mean + 4σ för ett urval.
+ * Returnerar dynamiskt redMax = p99 för ett urval.
  * Fallback till CONFIG-värdet om baseline saknas.
  */
 function baselineRedMax(type, countySet) {
   const norm = getBaselineNorm(type, countySet);
   if (!norm) return type === 'olyckor' ? CONFIG.olyckorRedMax : CONFIG.storningarRedMax;
-  return Math.max(norm.mean + 4 * norm.std, 1); // minst 1 för att undvika division med noll
+  return Math.max(norm.p99, 1);
 }
 
 /**
- * Returnerar färg för ett värde relativt baseline.
- * Grön vid ≤ mean+1σ, gradient mot röd vid mean+4σ.
- * Om baseline ej laddat: grå ring (gradientColor med speciell signal).
+ * Returnerar färg för ett värde relativt Poisson-baslinjen.
+ * Grön < p75 · Gul p75–p90 · Orange p90–p95 · Röd p95–p99 · Mörkröd > p99
+ * Om baseline ej laddat: grå ring.
  */
 function baselineColor(value, type, countySet) {
   if (value === null || value === undefined) return gradientColor(0);
   const norm = getBaselineNorm(type, countySet);
-  if (!norm) {
-    // Baseline ej laddat – returnera grå (t=−1 som signal, hanteras nedan)
-    return { stroke: '#555', fill: '#1a1a1a' };
-  }
-  const lower = norm.mean + 1 * norm.std;
-  const upper = norm.mean + 4 * norm.std;
-  if (upper <= lower) return gradientColor(value > lower ? 1 : 0);
-  const t = Math.max(0, Math.min(1, (value - lower) / (upper - lower)));
+  if (!norm) return { stroke: '#555', fill: '#1a1a1a' };
+
+  // t=0 → grön, t=1 → mörkröd – fem zoner mappade till gradientColor
+  let t;
+  if      (value < norm.p75) t = Math.max(0, value / Math.max(norm.p75, 1)) * 0.25;
+  else if (value < norm.p90) t = 0.25 + ((value - norm.p75) / Math.max(norm.p90 - norm.p75, 1)) * 0.20;
+  else if (value < norm.p95) t = 0.45 + ((value - norm.p90) / Math.max(norm.p95 - norm.p90, 1)) * 0.20;
+  else if (value < norm.p99) t = 0.65 + ((value - norm.p95) / Math.max(norm.p99 - norm.p95, 1)) * 0.20;
+  else                       t = Math.min(1.0, 0.85 + ((value - norm.p99) / Math.max(norm.p99, 1)) * 0.15);
+
   return gradientColor(t);
 }
 let _flowAbort = null;
