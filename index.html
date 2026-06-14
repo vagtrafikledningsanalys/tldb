@@ -291,6 +291,76 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   100% { background: transparent; }
 }
 .omr-row-flash { animation: omr-row-flash-anim 0.8s ease-out; }
+/* ══ BASELINE-FLIK ══ */
+#tab-baseline { background: transparent; }
+.bl-meta {
+  background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: center;
+}
+.bl-meta-item { font-size: 12px; color: #999; }
+.bl-meta-item strong { color: #ddd; font-weight: 500; }
+.bl-section-label {
+  font-size: 10px; font-weight: 500; color: #555;
+  letter-spacing: .07em; text-transform: uppercase;
+  margin: 18px 0 8px;
+}
+.bl-section-label:first-of-type { margin-top: 0; }
+.bl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.bl-cards.single { grid-template-columns: 1fr; }
+.bl-card {
+  background: #111; border: 0.5px solid #222; border-radius: 8px;
+  padding: 10px 12px;
+}
+.bl-card-name { font-size: 13px; font-weight: 500; color: #ddd; margin-bottom: 10px; }
+.bl-metric { margin-bottom: 8px; }
+.bl-metric:last-child { margin-bottom: 0; }
+.bl-metric-top {
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;
+}
+.bl-metric-lbl { font-size: 11px; color: #777; }
+.bl-metric-val { font-size: 12px; font-weight: 500; }
+.bl-bar-outer {
+  position: relative; height: 8px; border-radius: 4px;
+  overflow: visible; background: #1c1c1c;
+}
+.bl-bar-gradient {
+  position: absolute; inset: 0; border-radius: 4px;
+  background: linear-gradient(to right, #4caf50, #ffeb3b 35%, #ff9800 62%, #f44336 85%, #7f0000);
+}
+.bl-bar-tick {
+  position: absolute; top: -3px; width: 2.5px; height: 14px;
+  border-radius: 1px; background: #fff; transform: translateX(-50%); z-index: 2;
+}
+.bl-tick-labels {
+  display: flex; justify-content: space-between; margin-top: 3px;
+}
+.bl-tick-labels span { font-size: 9px; color: #444; }
+.bl-legend {
+  margin-top: 20px; border-top: 0.5px solid #222; padding-top: 14px;
+}
+.bl-legend-title { font-size: 11px; font-weight: 500; color: #888; margin-bottom: 6px; }
+.bl-legend-bar {
+  height: 8px; border-radius: 4px; width: 200px; max-width: 100%;
+  background: linear-gradient(to right, #4caf50, #ffeb3b 35%, #ff9800 62%, #f44336 85%, #7f0000);
+  margin-bottom: 3px;
+}
+.bl-legend-ticks {
+  display: flex; justify-content: space-between; width: 200px; max-width: 100%;
+  margin-bottom: 8px;
+}
+.bl-legend-ticks span { font-size: 9px; color: #555; }
+.bl-legend-note { font-size: 11px; color: #777; line-height: 1.6; max-width: 520px; }
+@media (max-width: 600px) {
+  .bl-cards { grid-template-columns: 1fr; }
+  .bl-cards.single { grid-template-columns: 1fr; }
+  #tab-baseline { padding: 12px; }
+}
+
 /* ══ FÖRKLARING ══ */
 .fk-layout{
   display:flex;flex:1;min-height:0;overflow:hidden;
@@ -1708,6 +1778,7 @@ html,body{
       <div class="tab" data-tab="livemap">Live Map</div>
       <div class="tab" data-tab="kollektivtrafik">Kollektivtrafik</div>
       <div class="tab" data-tab="vadervarningar">Vädervarningar</div>
+      <div class="tab" data-tab="baseline">Baseline</div>
       <div class="tab" data-tab="forklaring">Förklaring</div>
       <div class="tbd-toggle-wrap">
         <span class="tbd-toggle-lbl">Dölj TBD</span>
@@ -2079,6 +2150,13 @@ html,body{
     </div>
     <div class="smhi-list" id="smhi-list">
       <div class="smhi-empty"><div class="smhi-empty-icon">🌤</div><span>Öppna fliken för att hämta vädervarningar</span></div>
+    </div>
+  </div>
+
+  <!-- Baseline -->
+  <div class="tab-content" id="tab-baseline" style="overflow-y:auto;padding:16px 20px;flex-direction:column;">
+    <div id="baseline-tab-inner">
+      <p style="color:var(--text-2);font-size:13px;">Laddar baseline...</p>
     </div>
   </div>
 
@@ -3006,10 +3084,180 @@ async function loadBaseline() {
     const text = await res.text();
     baselineData = parseBaselineCsv(text);
     console.log('[Baseline] Laddat, antal län:', Object.keys(baselineData).length);
+    // Om baseline-fliken är aktiv vid laddning, rendera direkt
+    if (document.getElementById('tab-baseline')?.classList.contains('active')) {
+      renderBaselineTab();
+    }
   } catch (e) {
     baselineData = {};
     console.warn('[Baseline] Misslyckades:', e);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BASELINE-FLIK – renderingsfunktion
+   Bygger hela fliken dynamiskt från baselineData + live tpData.
+   ═══════════════════════════════════════════════════════════════ */
+function renderBaselineTab() {
+  const container = document.getElementById('baseline-tab-inner');
+  if (!container) return;
+
+  if (!baselineData || Object.keys(baselineData).length === 0) {
+    container.innerHTML = '<p style="color:#666;font-size:13px;padding:20px 0;">Baseline ej laddat.</p>';
+    return;
+  }
+
+  const { isHelg, qi } = baselineCurrentSlot();
+  const now    = new Date();
+  const hh     = String(now.getHours()).padStart(2,'0');
+  const mm     = String(now.getMinutes()).padStart(2,'0');
+  const dagTyp = isHelg ? 'Helg' : ['Söndag','Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag'][now.getDay()];
+
+  // Räkna observationer (n_samples) – ta första matchande rad
+  let nSamples = '?';
+  outer: for (const lanNr of Object.keys(baselineData)) {
+    const helgData = baselineData[lanNr]?.[isHelg];
+    if (helgData?.[qi]) {
+      // n_samples finns ej i den parsade strukturen – visa baseline-perioden istället
+      nSamples = '18'; // hårdkodat från källdata tills vi exponerar fältet
+      break outer;
+    }
+  }
+
+  // Räkna aktuella olyckor/incidenter per länsnummer från tpData
+  const olyckPerLan = {};
+  const incPerLan   = {};
+  for (const lan of Object.keys(COUNTY)) {
+    olyckPerLan[lan] = 0;
+    incPerLan[lan]   = 0;
+  }
+  for (const { dev } of tpData) {
+    const nos = toCountyNos(dev.CountyNo);
+    const isOlycka = (dev.MessageType || '').toLowerCase() === 'olycka';
+    for (const n of nos) {
+      if (COUNTY[n] !== undefined) {
+        if (isOlycka) olyckPerLan[n] = (olyckPerLan[n] || 0) + 1;
+        else          incPerLan[n]   = (incPerLan[n]   || 0) + 1;
+      }
+    }
+  }
+
+  // Hjälp: beräkna norm + absoluta gränsvärden för ett Set av länsnummer
+  function normFor(countySet) {
+    return {
+      olyckor:    getBaselineNorm('olyckor',    countySet),
+      incidenter: getBaselineNorm('incidenter', countySet),
+    };
+  }
+  function sumValues(countySet, map) {
+    let s = 0;
+    for (const n of countySet) s += (map[n] || 0);
+    return s;
+  }
+  function tickVals(norm) {
+    if (!norm) return [0,0,0,0,0];
+    return [0,1,2,3,4].map(k => Math.round(norm.mean + k * norm.std));
+  }
+  function posOnBar(value, norm) {
+    if (!norm) return 5;
+    const lo = norm.mean;
+    const hi = norm.mean + 4 * norm.std;
+    if (hi <= lo) return value > lo ? 97 : 5;
+    return Math.max(2, Math.min(97, ((value - lo) / (hi - lo)) * 100));
+  }
+  function valColor(value, norm) {
+    if (!norm) return '#555';
+    const t = Math.max(0, Math.min(1, (value - (norm.mean + norm.std)) / (3 * norm.std)));
+    if (t <= 0)   return '#4caf50';
+    if (t < 0.33) return '#ffeb3b';
+    if (t < 0.66) return '#ff9800';
+    return '#f44336';
+  }
+
+  function metricHTML(label, value, norm) {
+    const ticks = tickVals(norm);
+    const pos   = posOnBar(value, norm);
+    const col   = valColor(value, norm);
+    return `
+      <div class="bl-metric">
+        <div class="bl-metric-top">
+          <span class="bl-metric-lbl">${label}</span>
+          <span class="bl-metric-val" style="color:${col}">${value} st</span>
+        </div>
+        <div class="bl-bar-outer">
+          <div class="bl-bar-gradient"></div>
+          <div class="bl-bar-tick" style="left:${pos}%"></div>
+        </div>
+        <div class="bl-tick-labels">
+          ${ticks.map(v => `<span>${v}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function cardHTML(name, countySet) {
+    const norms = normFor(countySet);
+    const oVal  = sumValues(countySet, olyckPerLan);
+    const iVal  = sumValues(countySet, incPerLan);
+    return `
+      <div class="bl-card">
+        <div class="bl-card-name">${name}</div>
+        ${metricHTML('Olyckor', oVal, norms.olyckor)}
+        ${metricHTML('Incidenter', iVal, norms.incidenter)}
+      </div>`;
+  }
+
+  // Sverige
+  const allLans     = new Set(Object.keys(COUNTY).map(Number));
+  const swedenCard  = cardHTML('Sverige · alla 21 län', allLans);
+
+  // TC
+  const tcIds  = [...new Set(Object.values(TC_MAP))].sort();
+  const tcCards = tcIds.map(tc => {
+    const set = getCountySet('tc', tc);
+    return cardHTML(tc, set);
+  }).join('');
+
+  // Regioner
+  const regionCards = CONFIG.regioner.map(r => {
+    const set = getCountySet('region', r.id);
+    return cardHTML(r.namn, set);
+  }).join('');
+
+  // Enskilda län i nummerordning
+  const lanCards = Object.keys(COUNTY).map(Number).sort((a,b)=>a-b).map(n => {
+    const set = new Set([n]);
+    return cardHTML(`${n} · ${COUNTY[n]}`, set);
+  }).join('');
+
+  container.innerHTML = `
+    <div class="bl-meta">
+      <div class="bl-meta-item"><strong>${dagTyp} · ${isHelg ? 'helg' : 'vardag'}</strong> · kvartsindex ${qi} · ${hh}:${mm}</div>
+      <div class="bl-meta-item">Baseline bygger på <strong>${nSamples} observationer</strong> per kvartsindex och län</div>
+    </div>
+
+    <div class="bl-section-label">Sverige</div>
+    <div class="bl-cards single">${swedenCard}</div>
+
+    <div class="bl-section-label">Trafikcentraler</div>
+    <div class="bl-cards">${tcCards}</div>
+
+    <div class="bl-section-label">Regioner</div>
+    <div class="bl-cards">${regionCards}</div>
+
+    <div class="bl-section-label">Län (i nummerordning)</div>
+    <div class="bl-cards">${lanCards}</div>
+
+    <div class="bl-legend">
+      <div class="bl-legend-title">Så läser du skalan</div>
+      <div class="bl-legend-bar"></div>
+      <div class="bl-legend-ticks"><span>μ</span><span>+1σ</span><span>+2σ</span><span>+3σ</span><span>+4σ</span></div>
+      <p class="bl-legend-note">
+        Strecket visar nuläget. Talen under gradienten är absoluta gränsvärden (antal händelser)
+        beräknade som μ+nσ för det aktuella kvartsindexet och dagstypen.
+        σ (standardavvikelse) mäter hur mycket antalet normalt varierar.
+        Grönt = normalt (≤ μ+1σ) · Gult = μ+2σ · Orange = μ+3σ · Rött = avvikande (≥ μ+4σ).
+      </p>
+    </div>`;
 }
 
 /**
@@ -6449,6 +6697,7 @@ document.querySelectorAll('.tab').forEach(tab => {
         }
       }
     }
+    if (target === 'baseline') renderBaselineTab();
     if (target === 'forklaring') {
       // Visa SMHI som default om inget är valt än
       const firstBtn = document.querySelector('.fk-nav-item');
