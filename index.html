@@ -3073,6 +3073,7 @@ function parseBaselineCsv(csv) {
       std_olyckor:      get(row, 'std_olyckor'),
       mean_incidenter:  get(row, 'mean_incidenter'),
       std_incidenter:   get(row, 'std_incidenter'),
+      n_samples:        get(row, 'n_samples'),
     };
   }
   return result;
@@ -3113,13 +3114,13 @@ function renderBaselineTab() {
   const mm     = String(now.getMinutes()).padStart(2,'0');
   const dagTyp = isHelg ? 'Helg' : ['Söndag','Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag'][now.getDay()];
 
-  // Räkna observationer (n_samples) – ta första matchande rad
+  // Läs n_samples från första matchande rad i baselineData
   let nSamples = '?';
   outer: for (const lanNr of Object.keys(baselineData)) {
-    const helgData = baselineData[lanNr]?.[isHelg];
-    if (helgData?.[qi]) {
-      // n_samples finns ej i den parsade strukturen – visa baseline-perioden istället
-      nSamples = '18'; // hårdkodat från källdata tills vi exponerar fältet
+    const row = baselineData[lanNr]?.[isHelg]?.[qi];
+    if (row) {
+      const n = row.n_samples;
+      if (!isNaN(n)) { nSamples = String(Math.round(n)); }
       break outer;
     }
   }
