@@ -3177,6 +3177,7 @@ function renderBaselineTab() {
   }
   function valColor(value, norm) {
     if (!norm) return '#555';
+    if (value <= 2) return '#4caf50'; // 0–2 alltid grönt
     if (value <  norm.p75) return '#4caf50';
     if (value <  norm.p90) return '#ffeb3b';
     if (value <  norm.p95) return '#ff9800';
@@ -3315,6 +3316,7 @@ function baselineRedMax(type, countySet) {
  */
 function baselineColor(value, type, countySet) {
   if (value === null || value === undefined) return gradientColor(0);
+  if (value <= 2) return gradientColor(0); // 0–2 alltid grönt
   const norm = getBaselineNorm(type, countySet);
   if (!norm) return { stroke: '#555', fill: '#1a1a1a' };
 
