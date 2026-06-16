@@ -2923,7 +2923,7 @@ async function fetchRoadCondition() {
     omrUpdate();
 
   } catch (err) {
-    console.error('RoadCondition fetch error:', err);
+    console.warn('RoadCondition fetch error:', err);
   }
 }
 
@@ -3389,7 +3389,7 @@ async function fetchFlowAll() {
 
   } catch (err) {
     if (err.name === 'AbortError') return;
-    console.error('TrafficFlow fetch error:', err);
+    console.warn('TrafficFlow fetch error:', err);
   }
 }
 
@@ -3403,7 +3403,7 @@ const LIVEDATA = Object.fromEntries(
 );
 
 /* ── D1-loggning ── */
-// Skicka en snapshot per region till D1 var 5:e minut
+// Skicka en snapshot per region till D1 – intervall styrs av CONFIG.interval.loggning
 async function logSnapshot() {
   try {
     const now     = Math.floor(Date.now() / 1000);
@@ -4211,8 +4211,8 @@ setInterval(()=>{
 
 /* ═══════════════════════════════════════════════════════════════
    WAZE — UsersOnJams per region
-   Försöker direktanrop först, faller sedan tillbaka via tre
-   publika CORS-proxies. Uppdateras var 5:e minut.
+   Hämtas via Cloudflare-proxy (direktanrop blockeras av CORS).
+   Intervall styrs av CONFIG.interval.waze.
    ═══════════════════════════════════════════════════════════════ */
 
 // Waze hämtas via proxy
@@ -4237,8 +4237,8 @@ async function fetchWazeRegion(regionId, url) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(res.status);
     data = await res.json();
-  } catch {
-    console.warn(`Waze: anrop misslyckades för ${regionId}`);
+  } catch (e) {
+    console.warn(`Waze: anrop misslyckades för ${regionId}`, e);
     return null;
   }
 
@@ -4254,7 +4254,7 @@ async function fetchWazeRegion(regionId, url) {
     });
     return result;
   } catch (err) {
-    console.error(`Waze parse error (${regionId}):`, err);
+    console.warn(`Waze parse error (${regionId}):`, err);
     return null;
   }
 }
@@ -4361,7 +4361,7 @@ async function fetchSMHI() {
     if (lbl) lbl.textContent = 'Uppdaterad ' + new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
 
   } catch (err) {
-    console.error('SMHI fetch error:', err);
+    console.warn('SMHI fetch error:', err);
     if (list) list.innerHTML = `<div class="smhi-empty"><div class="smhi-empty-icon">⚠</div><span>Kunde inte hämta vädervarningar: ${err.message}</span></div>`;
   } finally {
     if (btn) btn.classList.remove('spinning');
