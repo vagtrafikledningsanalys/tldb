@@ -2320,6 +2320,10 @@ const API_KEYS = {
   // vasttrafik: '',
 };
 
+// Härledda konstanter från API_KEYS – används genomgående i fetch-anrop
+const API_URL  = `${PROXY_BASE}/trafikverket`;
+const AUTH_KEY = API_KEYS.trafikverket;
+
 /* ═══════════════════════════════════════════════════════════════
    GEOGRAFIDEFINITIONER
    Används för att mappa inkommande data (CountyNo) till region,
@@ -2956,11 +2960,11 @@ function buildCard(container, regionCfg, data, sz, titleFs, lblFs, cellGap) {
    medelvärde per region. Uppdateras var 60:e minut (ändras sällan).
    ═══════════════════════════════════════════════════════════════ */
 
-let vaglagInitialized = false;
+const vaglagState = { initialized: false };
 
 function vaglagInit() {
-  if (!vaglagInitialized) {
-    vaglagInitialized = true;
+  if (!vaglagState.initialized) {
+    vaglagState.initialized = true;
     fetchRoadCondition();
     setInterval(fetchRoadCondition, CONFIG.interval.vaglag);
   }
@@ -3344,7 +3348,6 @@ function baselineColor(value, type, countySet) {
   return gradientColor(t);
 }
 let _flowAbort = null;
-let flowInitialized = false;
 
 // Ladda historik från localStorage vid start – fyller speedHistory med sparade punkter
 async function loadSpeedHistory() {
@@ -3377,9 +3380,11 @@ function saveSpeedHistory() {
   }
 }
 
+const flowState = { initialized: false };
+
 function flowInit() {
-  if (!flowInitialized) {
-    flowInitialized = true;
+  if (!flowState.initialized) {
+    flowState.initialized = true;
     loadSpeedHistory().then(() => fetchFlowAll());
     setInterval(fetchFlowAll, CONFIG.interval.trafikflode);
   }
@@ -3671,11 +3676,10 @@ const KT_BUS = [
 const KT_ALL_SL = [...KT_METRO, ...KT_PENDEL, ...KT_BUS];
 
 let ktSlDepCache = {}, ktLineData = {}, ktActive = null;
-let ktInitialized = false;
-
+const ktState = { initialized: false };
 function ktInit() {
-  if (!ktInitialized) {
-    ktInitialized = true;
+  if (!ktState.initialized) {
+    ktState.initialized = true;
     ktMakeSLGrids();
     ktLoadAll();
     setInterval(ktLoadAll, CONFIG.interval.kollektivtrafik);
@@ -3857,9 +3861,6 @@ async function ktLoadAll() {
    flikbesök. Uppdateras automatiskt var 2:e minut.
    ═══════════════════════════════════════════════════════════════ */
 
-const API_URL  = `${PROXY_BASE}/trafikverket`;
-const AUTH_KEY = API_KEYS.trafikverket;
-
 const MS_PER_HOUR = 3_600_000;
 
 /* Kapacitetstabell: "begränsade-totala" → kvarv. kapacitet % */
@@ -3955,19 +3956,19 @@ const CO_XML_VAGARBETE = `<REQUEST>
   </QUERY>
 </REQUEST>`;
 
+const tpState = { initialized: false };
 let tpData       = [];
 let tpFetch      = null;
 const _enrichCache = new Map(); // "E,N" → { adt, laneCount } – bevaras hela sessionen
 let tpSort       = 'severity';
 let tpDir        = -1;
 let _coAbort     = null;
-let tpInitialized = false;
 const tpModalCache = new Map(); // idx → rad för störningsfliken
 const omrModalCache = new Map(); // idx → rad för Område-fliken (topp-lista)
 
 function tpInit() {
-  if (!tpInitialized) {
-    tpInitialized = true;
+  if (!tpState.initialized) {
+    tpState.initialized = true;
     fetchTPData();
     setInterval(fetchTPData, CONFIG.interval.storningar);
   }
@@ -4308,12 +4309,11 @@ setInterval(()=>{
    ═══════════════════════════════════════════════════════════════ */
 
 // Waze hämtas via proxy
-
-let wazeInitialized = false;
+const wazeState = { initialized: false };
 
 function wazeInit() {
-  if (!wazeInitialized) {
-    wazeInitialized = true;
+  if (!wazeState.initialized) {
+    wazeState.initialized = true;
     fetchAllWaze();
     setInterval(fetchAllWaze, CONFIG.interval.waze);
   }
@@ -4395,15 +4395,14 @@ const CO_NAMES = {
   ostra:'Östra', sydostra:'Sydöstra', sodra:'Södra',
 };
 
+const smhiState = { initialized: false };
 let smhiData        = [];
 let smhiFilterLevel = 'ALL';
 let smhiFilterArea  = 'ALL';
 let smhiFetched     = false;
-let smhiInitialized = false;
-
 function smhiInit() {
-  if (!smhiInitialized) {
-    smhiInitialized = true;
+  if (!smhiState.initialized) {
+    smhiState.initialized = true;
     fetchSMHI();
     setInterval(fetchSMHI, CONFIG.interval.smhi);
   }
