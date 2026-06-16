@@ -2387,6 +2387,15 @@ const countyToArea = no => COUNTY_AREA[no] ?? null;
 const countyToName = no => COUNTY[no]      ?? `Län ${no}`;
 const countyToTC   = no => TC_MAP[no]      ?? 'Okänd TC';
 
+/**
+ * TC-namn → MCS-nyckel (används av MCS-trenden för att slå upp hastighetshistorik).
+ * Uppdatera här om en TC får MCS-koppling eller byter nyckel.
+ */
+const TC_MCS_KEY = {
+  'TC Öst':  'ostra',
+  'TC Väst': 'vastra',
+};
+
 
 // Starttillstånd för en region – enda stället där LIVEDATA-fältlistan definieras.
 // Alla fält som skrivs till LIVEDATA måste finnas här, annars riskerar
@@ -2798,7 +2807,7 @@ function buildIndicatorList(cfg, data) {
       : { type:'tbd',      label:'TBD',        data:{} },
     { sep: 'Beredskap' },
     cfg.harMCS
-      ? { type:'mcsTrend', label:'MCS trend',  data:{ value: data.mcsTrend, regionKey: cfg.id === 'TC Öst' ? 'ostra' : cfg.id === 'TC Väst' ? 'vastra' : cfg.id } }
+      ? { type:'mcsTrend', label:'MCS trend',  data:{ value: data.mcsTrend, regionKey: TC_MCS_KEY[cfg.id] ?? cfg.id } }
       : { type:'tbd',      label:'TBD',        data:{} },
     { type:'vagarbete', label:'Vägarbeten', data:{ value: data.vagarbeten } },
     { type:'tbd', label:'TBD', data:{} },
@@ -2893,7 +2902,7 @@ async function fetchRoadCondition() {
       if (code < 1 || code > 4) return;
       const countyNos = (Array.isArray(r.CountyNo) ? r.CountyNo : r.CountyNo != null ? [r.CountyNo] : []).map(v => String(v).split(',')[0]).filter(Boolean);
       countyNos.forEach(cn => {
-        const area = COUNTY_AREA[Number(cn)];
+        const area = countyToArea(Number(cn));
         if (!area) return;
         sums[area] += code;
         cnts[area]++;
@@ -4330,7 +4339,7 @@ async function fetchSMHI() {
         const coSet    = new Set();
         const counties = [];
         for (const a of affected) {
-          const co = COUNTY_AREA[Number(a.id)];
+          const co = countyToArea(Number(a.id));
           if (co) coSet.add(co);
           counties.push({ id: String(a.id), name: a.sv || a.en || `Län ${a.id}` });
         }
@@ -4472,7 +4481,7 @@ function omrResolve(type, id) {
     const set = new Set();
     for (const [countyNo, tc] of Object.entries(TC_MAP)) {
       if (tc === id) {
-        const area = COUNTY_AREA[Number(countyNo)];
+        const area = countyToArea(Number(countyNo));
         if (area) set.add(area);
       }
     }
@@ -4870,7 +4879,7 @@ function omrUpdate() {
    ────────────────────────────────────────────────────────────── */
 function ttLanToArea(lanCode) {
   if (!lanCode) return null;
-  return COUNTY_AREA[parseInt(lanCode, 10)] || null;
+  return countyToArea(parseInt(lanCode, 10));
 }
 
 /**
