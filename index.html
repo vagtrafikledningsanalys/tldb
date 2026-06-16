@@ -3947,6 +3947,7 @@ const CO_XML_VAGARBETE = `<REQUEST>
 
 let tpData       = [];
 let tpFetch      = null;
+const _enrichCache = new Map(); // "E,N" → { adt, laneCount } – bevaras hela sessionen
 let tpSort       = 'severity';
 let tpDir        = -1;
 let _coAbort     = null;
@@ -4039,7 +4040,14 @@ async function enrichAll(items){
   for(let i=0;i<items.length;i+=C){
     await Promise.all(items.slice(i,i+C).map(async item=>{
       const c=parseCoords(item.dev?.Geometry?.SWEREF99TM);
-      if(c)[item.adt,item.laneCount]=await Promise.all([fetchADT(c.E,c.N),fetchLanes(c.E,c.N)]);
+      if(!c)return;
+      const key=`${c.E},${c.N}`;
+      if(_enrichCache.has(key)){
+        ({adt:item.adt,laneCount:item.laneCount}=_enrichCache.get(key));
+      }else{
+        [item.adt,item.laneCount]=await Promise.all([fetchADT(c.E,c.N),fetchLanes(c.E,c.N)]);
+        _enrichCache.set(key,{adt:item.adt,laneCount:item.laneCount});
+      }
     }));
     // Rita om progressivt efter varje batch så ÅDT visas allt eftersom
     if(document.getElementById('tab-storningar')?.classList.contains('active')) renderTPTable();
