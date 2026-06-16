@@ -6488,6 +6488,31 @@ function ttToggleDetails(routeId) {
   if (opening) { details.classList.add('tt-open'); card.classList.add('tt-expanded'); }
 }
 
+// ── Gemensam parsning av Trafikverket-situationer för Restid-fliken ──
+// extraFields(sit, dev) returnerar ett objekt med källspecifika fält.
+function ttParseTvSituations(json, extraFields) {
+  const result = [];
+  for (const sit of (json?.RESPONSE?.RESULT?.[0]?.Situation || [])) {
+    const devs = sit.Deviation || [];
+    const roadBlocked = devs.some(d => (d.MessageCode || '').toLowerCase().includes('vägen avstängd'));
+    for (const dev of devs) {
+      const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
+      if (m && String(dev.ManagedCause).toLowerCase() === 'true') result.push({
+        lon: +m[1], lat: +m[2],
+        code: dev.MessageCode || '',
+        message: dev.Message || '',
+        location: dev.LocationDescriptor || '',
+        direction: dev.AffectedDirectionValue || 'BothDirections',
+        lineVec: ttParseLineVec(dev.Geometry?.Line?.WGS84),
+        roadBlocked,
+        countyNos: (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : []).map(v => String(v).split(',')[0]).filter(Boolean),
+        ...extraFields(sit, dev)
+      });
+    }
+  }
+  return result;
+}
+
 // ── fetchTrafikverket för Restid — använder CO_XML från tldb2 ─────
 async function ttFetchTrafikverket() {
   try {
@@ -6495,30 +6520,12 @@ async function ttFetchTrafikverket() {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML
     });
     if (!res.ok) return;
-    const json = await res.json();
-    ttState.tvIncidents = [];
-    for (const sit of (json?.RESPONSE?.RESULT?.[0]?.Situation || [])) {
-      const devs = sit.Deviation || [];
-      // roadBlocked om någon deviation i situationen har "vägen avstängd" — oavsett vilken
-      const roadBlocked = devs.some(d => (d.MessageCode || '').toLowerCase().includes('vägen avstängd'));
-      for (const dev of devs) {
-        const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
-        if (m && String(dev.ManagedCause).toLowerCase() === 'true') ttState.tvIncidents.push({
-          lon: +m[1], lat: +m[2],
-          sitId: sit.Id || null,
-          code: dev.MessageCode || '',
-          message: dev.Message || '',
-          location: dev.LocationDescriptor || '',
-          direction: dev.AffectedDirectionValue || 'BothDirections',
-          lineVec: ttParseLineVec(dev.Geometry?.Line?.WGS84),
-          roadBlocked,
-          startTime: dev.StartTime || null,
-          endTime: dev.EndTime || null,
-          numberOfLanesRestricted: dev.NumberOfLanesRestricted ?? null,
-          countyNos: (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : []).map(v => String(v).split(',')[0]).filter(Boolean)
-        });
-      }
-    }
+    ttState.tvIncidents = ttParseTvSituations(await res.json(), (sit, dev) => ({
+      sitId: sit.Id || null,
+      startTime: dev.StartTime || null,
+      endTime: dev.EndTime || null,
+      numberOfLanesRestricted: dev.NumberOfLanesRestricted ?? null,
+    }));
   } catch (e) { console.warn('TT Trafikverket:', e); }
 }
 
@@ -6529,27 +6536,10 @@ async function ttFetchVagarbeten() {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML_VAGARBETE
     });
     if (!res.ok) return;
-    const json = await res.json();
-    ttState.tvVagarbeten = [];
-    for (const sit of (json?.RESPONSE?.RESULT?.[0]?.Situation || [])) {
-      const devs = sit.Deviation || [];
-      const roadBlocked = devs.some(d => (d.MessageCode || '').toLowerCase().includes('vägen avstängd'));
-      for (const dev of devs) {
-        const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
-        if (m && String(dev.ManagedCause).toLowerCase() === 'true') ttState.tvVagarbeten.push({
-          lon: +m[1], lat: +m[2],
-          code: dev.MessageCode || '',
-          message: dev.Message || '',
-          location: dev.LocationDescriptor || '',
-          direction: dev.AffectedDirectionValue || 'BothDirections',
-          lineVec: ttParseLineVec(dev.Geometry?.Line?.WGS84),
-          severityText: dev.SeverityText || '',
-          roadNumber: dev.RoadNumber || '',
-          roadBlocked,
-          countyNos: (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : []).map(v => String(v).split(',')[0]).filter(Boolean)
-        });
-      }
-    }
+    ttState.tvVagarbeten = ttParseTvSituations(await res.json(), (_sit, dev) => ({
+      severityText: dev.SeverityText || '',
+      roadNumber: dev.RoadNumber || '',
+    }));
   } catch (e) { console.warn('TT Vägarbeten:', e); }
   // Räkna om KPI-cirklar nu när vägarbetsdata uppdaterats
   updateOverview();
