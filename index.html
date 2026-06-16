@@ -2495,10 +2495,241 @@ function svgEl(tag, attrs) {
   return el;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   SVG_RENDERERS – en renderer per KPI-typ.
+   Varje funktion tar (data, ctx) och appendar element till ctx.svg.
+   ctx innehåller alla förberäknade mått och hjälpfunktioner från makeSVG.
+   Nytt KPI-kort = ny post i detta objekt, inget annat behöver ändras.
+   ═══════════════════════════════════════════════════════════════ */
+const SVG_RENDERERS = {
+
+  tbd(data, { svg, circle, text, fs }) {
+    svg.classList.add('kpi-tbd');
+    svg.appendChild(circle('#151515','#1e1e1e','1'));
+    svg.appendChild(text('–', fs*0.75, '#2a2a2a'));
+  },
+
+  /* ── 1. SMHI ── */
+  smhi(data, { svg, circle, text, fs, sz, cx }) {
+    const level = data.level;
+    if (level === null || level === undefined) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      svg.appendChild(text('…', fs*0.8, '#333'));
+      return;
+    }
+    const lvl = level || 'none';
+    if (lvl === 'none') {
+      svg.appendChild(circle('#152515','#2a8a2a','1.5'));
+      svg.appendChild(svgEl('polyline',{
+        points:`${cx-sz*0.18},${cx} ${cx-sz*0.04},${cx+sz*0.16} ${cx+sz*0.2},${cx-sz*0.14}`,
+        fill:'none', stroke:'#2a8a2a', 'stroke-width':Math.max(1.5,sz*0.07),
+        'stroke-linecap':'round','stroke-linejoin':'round'}));
+      return;
+    }
+    if (lvl === 'gray') {
+      svg.appendChild(circle('#1e1e1e','#666','1.5'));
+      svg.appendChild(text('i', fs*1.1, '#888'));
+      return;
+    }
+    if (lvl === 'yellow') {
+      svg.appendChild(circle('#2e2500','#b89800','2'));
+      svg.appendChild(text('!', fs*1.4, '#b89800'));
+      return;
+    }
+    if (lvl === 'orange') {
+      svg.appendChild(circle('#2e1800','#1a1a1a','1'));
+      const half = sz * 0.32;
+      svg.appendChild(svgEl('rect',{
+        x: cx - half, y: cx - half, width: half*2, height: half*2,
+        rx: 0, ry: 0, fill:'#2e1800', stroke:'#c05800', 'stroke-width':'2',
+        transform:`rotate(45 ${cx} ${cx})`}));
+      svg.appendChild(text('!', fs*1.2, '#c05800'));
+      return;
+    }
+    if (lvl === 'red') {
+      svg.appendChild(circle('#2e0a0a','#1a1a1a','1'));
+      const pad = sz * 0.08;
+      const r2  = sz/2 - pad;
+      svg.appendChild(svgEl('polygon',{
+        points:`${cx},${cx-r2} ${cx+r2*0.866},${cx+r2*0.5} ${cx-r2*0.866},${cx+r2*0.5}`,
+        fill:'#2e0a0a', stroke:'#b01a1a', 'stroke-width':'2', 'stroke-linejoin':'round'}));
+      svg.appendChild(text('!', fs*1.1, '#b01a1a', r2*0.12));
+    }
+  },
+
+  /* ── 2. Olyckor / Störningar (räknare med färgskala) ── */
+  count(data, { svg, circle, text, fs, fsS, fsXS }) {
+    if (data.value === null || data.value === undefined) {
+      const noDataCol = (baselineData === null) ? '#555' : '#252525';
+      svg.appendChild(circle('#1a1a1a', noDataCol, '1'));
+      svg.appendChild(text('…', fs*0.8, '#333'));
+      return;
+    }
+    const col = data.baselineCol ?? scaleColor(data.value, data.redMax);
+    svg.appendChild(circle(col.fill, col.stroke,'1.5'));
+    const n = fmtNum(data.value);
+    svg.appendChild(text(n, n.length > 4 ? fsXS : n.length > 3 ? fsS : fs, '#e0e0e0'));
+  },
+
+  /* ── 3. Trafikpåverkan ── */
+  trafik(data, { svg, circle, text, fs, fsS, fsXS }) {
+    if (data.value === null || data.value === undefined) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      svg.appendChild(text('…', fs*0.8, '#333'));
+      return;
+    }
+    const col = scaleColor(data.value, data.redMax);
+    svg.appendChild(circle(col.fill, col.stroke,'1.5'));
+    const n = fmtNum(data.value);
+    svg.appendChild(text(n, n.length > 4 ? fsXS : n.length > 3 ? fsS*0.9 : fsS, '#e0e0e0'));
+  },
+
+  /* ── 4. Väglag (snöflinga + arc) ── */
+  vaglag(data, { svg, circle, text, arc, arcW, fsXS, sz, cx }) {
+    if (data.value === null || data.value === undefined) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      svg.appendChild(text('…', fsXS*1.1, '#333'));
+      return;
+    }
+    const col = vaglagColor(data.value);
+    svg.appendChild(circle(col.fill,'#1a1a1a','1'));
+    svg.appendChild(arc(1, '#2a2a2a', arcW));
+    svg.appendChild(arc(Math.max(0, Math.min(1, (data.value - 1) / 3)), col.stroke, arcW));
+    const sf = sz * 0.18;
+    [[cx,cx-sf,cx,cx+sf],[cx-sf*0.866,cx-sf*0.5,cx+sf*0.866,cx+sf*0.5],[cx+sf*0.866,cx-sf*0.5,cx-sf*0.866,cx+sf*0.5]]
+      .forEach(([x1,y1,x2,y2]) => svg.appendChild(svgEl('line',{x1,y1,x2,y2,stroke:'#aad4f5',
+        'stroke-width':Math.max(1,sz*0.06),'stroke-linecap':'round'})));
+    svg.appendChild(text(data.value.toFixed(1), fsXS, '#aad4f5', sz*0.28));
+  },
+
+  /* ── 5. Restid WDI (fördröjningsindex, arc + procent) ── */
+  tomtom(data, { svg, circle, text, arcW, R, fsS, fsXS, cx }) {
+    if (!ttState.initialized || data.value === null || data.value === undefined) {
+      svg.appendChild(circle('#151515','#1e1e1e','1'));
+      svg.appendChild(text(ttState.initialized ? '…' : 'TBD', fsXS, '#2a2a2a'));
+      return;
+    }
+    const pct = data.value;
+    const { wdiGron, wdiGul, wdiRod } = CONFIG;
+    let fill, stroke;
+    if      (pct <= wdiGron) { fill = '#152515'; stroke = '#2a8a2a'; }
+    else if (pct <= wdiGul)  { fill = '#2a2200'; stroke = '#b89800'; }
+    else if (pct <= wdiRod)  { fill = '#2e0e0e'; stroke = '#c04040'; }
+    else                     { fill = '#1a0505'; stroke = '#7a0000'; }
+    svg.appendChild(circle(fill, '#1a1a1a', '1'));
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
+    const arcPct = Math.min(pct / (wdiRod * 1.5), 1);
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke,
+      'stroke-width':arcW,
+      'stroke-dasharray':`${arcPct*2*Math.PI*R} ${2*Math.PI*R}`,
+      'stroke-linecap':'round', transform:`rotate(-90 ${cx} ${cx})`}));
+    const label = (pct > 0 ? '+' : '') + pct + '%';
+    svg.appendChild(text(label, label.length > 4 ? fsXS : fsS, stroke));
+  },
+
+  /* ── 6. Waze (segmenterad arc: 5 nivåer + totalt i mitten) ── */
+  waze(data, { svg, circle, text, arcW, R, fsS, fsXS, cx }) {
+    const d = data.value;
+    const stale = data.wazeTs && (Date.now() - data.wazeTs) > CONFIG.interval.wazeMaxAge;
+    if (!d || stale) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      svg.appendChild(text(stale ? '?' : '…', fsS*0.9, '#333'));
+      return;
+    }
+    const total = (d.green||0)+(d.yellow||0)+(d.orange||0)+(d.red||0)+(d.darkred||0);
+    svg.appendChild(circle('#151515','#1a1a1a','1'));
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
+    const c2 = 2 * Math.PI * R;
+    let offset = 0;
+    [['green','#1fa81f'],['yellow','#c8a800'],['orange','#d06000'],['red','#c41a1a'],['darkred','#6b0000']]
+      .forEach(([key, col]) => {
+        const val = d[key] || 0;
+        if (!val || !total) return;
+        const pct = val / total;
+        svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:col,
+          'stroke-width':arcW,
+          'stroke-dasharray':`${pct*c2} ${c2-pct*c2}`,
+          'stroke-linecap':'butt',
+          transform:`rotate(${-90+offset*360} ${cx} ${cx})`}));
+        offset += pct;
+      });
+    const n = fmtNum(total);
+    svg.appendChild(text(n, n.length > 3 ? fsXS : fsS, '#e0e0e0'));
+  },
+
+  /* ── 7. Kollektivtrafik (medelförsening i min, arc) ── */
+  koll(data, { svg, circle, text, arcW, R, fs, fsXS, sz, cx }) {
+    if (data.value === null || data.value === undefined) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      svg.appendChild(text('…', fs*0.8, '#333'));
+      return;
+    }
+    const redMax = CONFIG.kollRedMax;
+    const col = scaleColor(data.value, redMax);
+    svg.appendChild(circle(col.fill,'#1a1a1a','1'));
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:col.stroke,
+      'stroke-width':arcW,
+      'stroke-dasharray':`${Math.min(data.value/redMax,1)*2*Math.PI*R} ${2*Math.PI*R}`,
+      'stroke-linecap':'round', transform:`rotate(-90 ${cx} ${cx})`}));
+    svg.appendChild(text(data.value.toFixed(1), fs, '#e0e0e0', -sz*0.05));
+    svg.appendChild(text('min', fsXS*0.85, '#888', sz*0.18));
+  },
+
+  /* ── 8. Vägarbeten (vit ring + antal) ── */
+  vagarbete(data, { svg, sz, cx }) {
+    svg.appendChild(svgEl('circle',{cx,cy:cx,r:sz*0.42,
+      fill:'none',stroke:'rgba(255,255,255,0.55)','stroke-width':Math.max(1.5,sz*0.055)}));
+    const txt = svgEl('text',{x:cx,y:cx,'text-anchor':'middle','dominant-baseline':'central',
+      'font-size':Math.max(10,Math.round(sz*0.34)),'font-weight':'700',
+      fill:'#ffffff','font-family':'system-ui,sans-serif','font-variant-numeric':'tabular-nums'});
+    txt.textContent = (data.value != null) ? String(data.value) : '—';
+    svg.appendChild(txt);
+  },
+
+  /* ── 9. MCS-trend (pil, riktning = hastighetstrend) ── */
+  mcsTrend(data, { svg, circle, text, fs, fsS, sz, cx }) {
+    const histKey = data.regionKey || null;
+    const startTs = histKey ? (speedHistoryStart[histKey] || null) : null;
+    const WARMUP  = 15 * 60_000;
+    if (data.value === null || data.value === undefined) {
+      svg.appendChild(circle('#1a1a1a','#252525','1'));
+      if (startTs) {
+        const minsLeft = Math.ceil(Math.max(0, WARMUP-(Date.now()-startTs)) / 60_000);
+        const el1 = svgEl('text',{x:cx,y:cx+sz*0.06,'dominant-baseline':'middle','text-anchor':'middle',
+          'font-size':fsS,fill:'#ccc','font-weight':'600','font-family':'system-ui,sans-serif'});
+        el1.textContent = minsLeft + 'm';
+        const el2 = svgEl('text',{x:cx,y:cx+sz*0.32,'dominant-baseline':'middle','text-anchor':'middle',
+          'font-size':fsS*0.85,fill:'#999','font-family':'system-ui,sans-serif'});
+        el2.textContent = 'kvar';
+        svg.appendChild(el1);
+        svg.appendChild(el2);
+      } else {
+        svg.appendChild(text('…', fs*0.8, '#999'));
+      }
+      return;
+    }
+    const v = data.value, MAX = 1.9;
+    const cols = v >= 0 ? gradientColor(0) : v <= -MAX ? gradientColor(1.0) : gradientColor((Math.abs(v)/MAX)*0.8);
+    svg.appendChild(circle(cols.fill, cols.stroke, '1.5'));
+    const deg = 90 - (Math.max(-MAX, Math.min(MAX, v)) / MAX) * 90;
+    const aL = sz*0.28, hL = sz*0.13, hW = sz*0.11;
+    svg.appendChild(svgEl('path',{
+      d:`M ${cx} ${cx+aL} L ${cx} ${cx-aL+hL} M ${cx-hW} ${cx-aL+hL} L ${cx} ${cx-aL} L ${cx+hW} ${cx-aL+hL}`,
+      stroke:cols.stroke,'stroke-width':Math.max(1.5,sz*0.055),
+      'stroke-linecap':'round','stroke-linejoin':'round',fill:'none',
+      transform:`rotate(${deg}, ${cx}, ${cx})`}));
+  },
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   makeSVG – dispatcher som delegerar till SVG_RENDERERS.
+   Bygger SVG-elementet och ctx-objektet, anropar rätt renderer.
+   ═══════════════════════════════════════════════════════════════ */
 function makeSVG(type, data, sz) {
   const arcW = Math.max(2, sz * 0.11);
-  const R    = sz / 2 - 1 - arcW / 2;   // arc radius inåt så stroke ryms
-  const Ro   = sz / 2 - 1;              // yttre cirkelradie
+  const R    = sz / 2 - 1 - arcW / 2;
+  const Ro   = sz / 2 - 1;
   const cx   = sz / 2;
   const fs   = Math.max(7,  sz * 0.24);
   const fsS  = Math.max(6,  sz * 0.18);
@@ -2506,7 +2737,6 @@ function makeSVG(type, data, sz) {
 
   const svg = svgEl('svg', { width:sz, height:sz, viewBox:`0 0 ${sz} ${sz}` });
 
-  /* Hjälpare */
   const circle = (f,s,sw,r) => svgEl('circle',{cx,cy:cx,r:r??Ro,fill:f,stroke:s,'stroke-width':sw});
   const text   = (txt, fs2, fill, dy=0) => {
     const t = svgEl('text', {x:cx, y:cx+dy, 'dominant-baseline':'middle',
@@ -2517,345 +2747,13 @@ function makeSVG(type, data, sz) {
   const arc = (pct, col, sw) => {
     const c2 = 2 * Math.PI * R;
     return svgEl('circle', {cx, cy:cx, r:R, fill:'none', stroke:col,
-      'stroke-width':sw,
-      'stroke-dasharray':`${pct*c2} ${c2}`,
-      'stroke-linecap':'round',
-      transform:`rotate(-90 ${cx} ${cx})`});
+      'stroke-width':sw, 'stroke-dasharray':`${pct*c2} ${c2}`,
+      'stroke-linecap':'round', transform:`rotate(-90 ${cx} ${cx})`});
   };
 
-  /* TBD */
-  if (type === 'tbd') {
-    svg.classList.add('kpi-tbd');
-    svg.appendChild(circle('#151515','#1e1e1e','1'));
-    svg.appendChild(text('–', fs*0.75, '#2a2a2a'));
-    return svg;
-  }
-
-  /* ── 1. SMHI ── */
-  if (type === 'smhi') {
-    const level = data.level;
-
-    // Null = data ej hämtad än – visa laddningsindikator
-    if (level === null || level === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      svg.appendChild(text('…', fs*0.8, '#333'));
-      return svg;
-    }
-
-    // Grön = ingen varning – bock
-    const lvl = level || 'none';
-    if (lvl === 'none') {
-      svg.appendChild(circle('#152515','#2a8a2a','1.5'));
-      const p = svgEl('polyline',{
-        points:`${cx-sz*0.18},${cx} ${cx-sz*0.04},${cx+sz*0.16} ${cx+sz*0.2},${cx-sz*0.14}`,
-        fill:'none', stroke:'#2a8a2a', 'stroke-width':Math.max(1.5,sz*0.07),
-        'stroke-linecap':'round','stroke-linejoin':'round'});
-      svg.appendChild(p);
-      return svg;
-    }
-
-    // Grå = meddelande – grå cirkel med i
-    if (lvl === 'gray') {
-      svg.appendChild(circle('#1e1e1e','#666','1.5'));
-      svg.appendChild(text('i', fs*1.1, '#888'));
-      return svg;
-    }
-
-    // Gul = gul cirkel med stort !
-    if (lvl === 'yellow') {
-      svg.appendChild(circle('#2e2500','#b89800','2'));
-      svg.appendChild(text('!', fs*1.4, '#b89800'));
-      return svg;
-    }
-
-    // Orange = kvadrat (på hörnet = rotera 45°) med !
-    if (lvl === 'orange') {
-      svg.appendChild(circle('#2e1800','#1a1a1a','1'));
-      const half = sz * 0.32;  // halva sidan av kvadraten
-      // Rita kvadrat roterad 45° = diamond
-      const sq = svgEl('rect',{
-        x: cx - half, y: cx - half,
-        width: half*2, height: half*2,
-        rx: 0, ry: 0,
-        fill:'#2e1800', stroke:'#c05800', 'stroke-width':'2',
-        transform:`rotate(45 ${cx} ${cx})`});
-      svg.appendChild(sq);
-      svg.appendChild(text('!', fs*1.2, '#c05800'));
-      return svg;
-    }
-
-    // Röd = triangel med ! – noggrant inpassad i cirkeln
-    if (lvl === 'red') {
-      svg.appendChild(circle('#2e0a0a','#1a1a1a','1'));
-      // Triangel som passar innanför cirkeln: inscriven triangel
-      const pad = sz * 0.08;
-      const r2  = sz/2 - pad;
-      // Liksidig triangel inscriven i cirkel: topp, nedre-höger, nedre-vänster
-      const topY    = cx - r2;
-      const botY    = cx + r2 * 0.5;
-      const leftX   = cx - r2 * 0.866;
-      const rightX  = cx + r2 * 0.866;
-      const tri = svgEl('polygon',{
-        points:`${cx},${topY} ${rightX},${botY} ${leftX},${botY}`,
-        fill:'#2e0a0a', stroke:'#b01a1a', 'stroke-width':'2',
-        'stroke-linejoin':'round'});
-      svg.appendChild(tri);
-      // ! centrerat i triangelns tyngdpunkt (lite under mitten)
-      svg.appendChild(text('!', fs*1.1, '#b01a1a', r2*0.12));
-      return svg;
-    }
-  }
-
-  /* ── 2. Olyckor / 3. Störningar (räknare med färgskala) ── */
-  if (type === 'count') {
-    if (data.value === null || data.value === undefined) {
-      // Grå ring om baseline ej laddat, annars standard tom-ring
-      const noDataCol = (baselineData === null) ? '#555' : '#252525';
-      svg.appendChild(circle('#1a1a1a', noDataCol, '1'));
-      svg.appendChild(text('…', fs*0.8, '#333'));
-      return svg;
-    }
-    // Använd baseline-färg om tillgänglig, annars scaleColor med hårdkodat redMax
-    const col = data.baselineCol ?? scaleColor(data.value, data.redMax);
-    svg.appendChild(circle(col.fill, col.stroke,'1.5'));
-    const n = fmtNum(data.value);
-    const f2 = n.length > 4 ? fsXS : n.length > 3 ? fsS : fs;
-    svg.appendChild(text(n, f2, '#e0e0e0'));
-    return svg;
-  }
-
-  /* ── 4. Trafikpåverkan ── */
-  if (type === 'trafik') {
-    if (data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      svg.appendChild(text('…', fs*0.8, '#333'));
-      return svg;
-    }
-    const col = scaleColor(data.value, data.redMax);
-    svg.appendChild(circle(col.fill, col.stroke,'1.5'));
-    const n = fmtNum(data.value);
-    const f2 = n.length > 4 ? fsXS : n.length > 3 ? fsS*0.9 : fsS;
-    svg.appendChild(text(n, f2, '#e0e0e0'));
-    return svg;
-  }
-
-  /* ── 5. Väglag (snöflinga + arc) ── */
-  if (type === 'vaglag') {
-    if (data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      svg.appendChild(text('…', fs*0.8, '#333'));
-      return svg;
-    }
-    const col = vaglagColor(data.value);
-    svg.appendChild(circle(col.fill,'#1a1a1a','1'));
-    svg.appendChild(arc(1, '#2a2a2a', arcW));
-    const pct = Math.max(0, Math.min(1, (data.value - 1) / 3));
-    svg.appendChild(arc(pct, col.stroke, arcW));
-    // Snöflinga enkel SVG
-    const sf = sz * 0.18;
-    const lines = [
-      [cx, cx-sf, cx, cx+sf],
-      [cx-sf*0.866, cx-sf*0.5, cx+sf*0.866, cx+sf*0.5],
-      [cx+sf*0.866, cx-sf*0.5, cx-sf*0.866, cx+sf*0.5],
-    ];
-    lines.forEach(([x1,y1,x2,y2]) => {
-      svg.appendChild(svgEl('line',{x1,y1,x2,y2,stroke:'#aad4f5',
-        'stroke-width':Math.max(1,sz*0.06),'stroke-linecap':'round'}));
-    });
-    // Värde under snöflinga
-    svg.appendChild(text(data.value.toFixed(1), fsXS, '#aad4f5', sz*0.28));
-    return svg;
-  }
-
-  /* ── 6. Restid WDI (fördröjningsindex, arc + procent) ── */
-  if (type === 'tomtom') {
-    // Ej initierat eller ingen data
-    if (!ttState.initialized || data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#151515','#1e1e1e','1'));
-      svg.appendChild(text(ttState.initialized ? '…' : 'TBD', fsXS, '#2a2a2a'));
-      return svg;
-    }
-
-    const pct = data.value; // heltal 0–∞ procent
-    const { wdiGron, wdiGul, wdiRod } = CONFIG;
-
-    // Välj färg utifrån konfigurerade trösklar
-    let fill, stroke;
-    if      (pct <= wdiGron) { fill = '#152515'; stroke = '#2a8a2a'; }
-    else if (pct <= wdiGul)  { fill = '#2a2200'; stroke = '#b89800'; }
-    else if (pct <= wdiRod)  { fill = '#2e0e0e'; stroke = '#c04040'; }
-    else                     { fill = '#1a0505'; stroke = '#7a0000'; }
-
-    svg.appendChild(circle(fill, '#1a1a1a', '1'));
-    // Bakgrunds-arc
-    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
-    // Fyll-arc: skala max vid wdiRod*1.5 så baren inte genast kör i botten
-    const arcPct = Math.min(pct / (wdiRod * 1.5), 1);
-    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke,
-      'stroke-width':arcW,
-      'stroke-dasharray':`${arcPct*2*Math.PI*R} ${2*Math.PI*R}`,
-      'stroke-linecap':'round',
-      transform:`rotate(-90 ${cx} ${cx})`}));
-
-    // Värdetext: "+12%" eller "0%"
-    const label = (pct > 0 ? '+' : '') + pct + '%';
-    const f2 = label.length > 4 ? fsXS : fsS;
-    svg.appendChild(text(label, f2, stroke));
-    return svg;
-  }
-
-  /* ── 7. Waze (segmenterad arc: 5 nivåer + totalt i mitten) ── */
-  if (type === 'waze') {
-    const d = data.value;
-    const stale = data.wazeTs && (Date.now() - data.wazeTs) > CONFIG.interval.wazeMaxAge;
-    if (!d || stale) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      svg.appendChild(text(stale ? '?' : '…', fs*0.8, '#333'));
-      return svg;
-    }
-    const total = (d.green||0) + (d.yellow||0) + (d.orange||0) + (d.red||0) + (d.darkred||0);
-    svg.appendChild(circle('#151515','#1a1a1a','1'));
-    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
-
-    const segments = [
-      { val: d.green||0,   col:'#1fa81f' },
-      { val: d.yellow||0,  col:'#c8a800' },
-      { val: d.orange||0,  col:'#d06000' },
-      { val: d.red||0,     col:'#c41a1a' },
-      { val: d.darkred||0, col:'#6b0000' },
-    ];
-    const c2 = 2 * Math.PI * R;
-    let offset = 0;
-    segments.forEach(seg => {
-      if (!seg.val || total === 0) return;
-      const pct  = seg.val / total;
-      const dash = pct * c2;
-      const gap  = c2 - dash;
-      const deg  = -90 + offset * 360;
-      svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:seg.col,
-        'stroke-width':arcW,
-        'stroke-dasharray':`${dash} ${gap}`,
-        'stroke-linecap':'butt',
-        transform:`rotate(${deg} ${cx} ${cx})`}));
-      offset += pct;
-    });
-
-    const n  = fmtNum(total);
-    const f2 = n.length > 3 ? fsXS : fsS;
-    svg.appendChild(text(n, f2, '#e0e0e0'));
-    return svg;
-  }
-
-  /* ── 8. Kollektivtrafik (medelförsening i min, arc) ── */
-  if (type === 'koll') {
-    if (data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      svg.appendChild(text('…', fs*0.8, '#333'));
-      return svg;
-    }
-    const redMax = CONFIG.kollRedMax;
-    const pct = Math.min(data.value / redMax, 1);
-    const col = scaleColor(data.value, redMax);
-    svg.appendChild(circle(col.fill,'#1a1a1a','1'));
-    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:'#2a2a2a','stroke-width':arcW}));
-    svg.appendChild(svgEl('circle',{cx,cy:cx,r:R,fill:'none',stroke:col.stroke,
-      'stroke-width':arcW,
-      'stroke-dasharray':`${pct*2*Math.PI*R} ${2*Math.PI*R}`,
-      'stroke-linecap':'round',
-      transform:`rotate(-90 ${cx} ${cx})`}));
-    svg.appendChild(text(data.value.toFixed(1), fs, '#e0e0e0', -sz*0.05));
-    svg.appendChild(text('min', fsXS*0.85, '#888', sz*0.18));
-    return svg;
-  }
-
-  /* ── 9. MCS-trend (pil + värde, fetare text) ── */
-  if (type === 'vagarbete') {
-    // Vit ring + antal i vitt, ingen färgskala
-    const ring = svgEl('circle', { cx:cx, cy:cx, r:sz*0.42,
-      fill:'none', stroke:'rgba(255,255,255,0.55)', 'stroke-width': Math.max(1.5, sz*0.055) });
-    svg.appendChild(ring);
-    const txt = svgEl('text', { x:cx, y:cx, 'text-anchor':'middle', 'dominant-baseline':'central',
-      'font-size': Math.max(10, Math.round(sz*0.34)), 'font-weight':'700',
-      fill:'#ffffff', 'font-family':'system-ui,sans-serif', 'font-variant-numeric':'tabular-nums' });
-    txt.textContent = (data.value != null) ? String(data.value) : '—';
-    svg.appendChild(txt);
-    return svg;
-  }
-
-  if (type === 'mcsTrend') {
-    // Räkna ut hur lång historik som samlats för detta område (vastra/ostra)
-    // data.regionKey sätts av buildCard/buildOmrKpiStrip om tillgängligt
-    const histKey = data.regionKey || null;
-    const startTs = histKey ? (speedHistoryStart[histKey] || null) : null;
-    const WARMUP  = 15 * 60_000; // 15 minuter
-
-    // Visa nedräkning om vi inte samlat 15 min ännu
-    if (data.value === null || data.value === undefined) {
-      svg.appendChild(circle('#1a1a1a','#252525','1'));
-      if (startTs) {
-        const remaining = Math.max(0, WARMUP - (Date.now() - startTs));
-        const minsLeft  = Math.ceil(remaining / 60_000);
-        const countEl   = svgEl('text', {
-          x: cx, y: cx + sz * 0.06,
-          'dominant-baseline': 'middle', 'text-anchor': 'middle',
-          'font-size': fsS, fill: '#ccc', 'font-weight': '600',
-          'font-family': 'system-ui,sans-serif'
-        });
-        countEl.textContent = minsLeft + 'm';
-        const subEl = svgEl('text', {
-          x: cx, y: cx + sz * 0.32,
-          'dominant-baseline': 'middle', 'text-anchor': 'middle',
-          'font-size': fsS * 0.85, fill: '#999', 'font-family': 'system-ui,sans-serif'
-        });
-        subEl.textContent = 'kvar';
-        svg.appendChild(countEl);
-        svg.appendChild(subEl);
-      } else {
-        svg.appendChild(text('…', fs * 0.8, '#999'));
-      }
-      return svg;
-    }
-
-    const v   = data.value;
-    const MAX = 1.9;
-
-    // Färg: ≥0 = grön, 0→-1.9 gradient grön→röd, <-1.9 mörkröd
-    let cols;
-    if (v >= 0) {
-      cols = gradientColor(0);
-    } else if (v <= -MAX) {
-      cols = gradientColor(1.0);
-    } else {
-      const t = (Math.abs(v) / MAX) * 0.8;
-      cols = gradientColor(t);
-    }
-
-    svg.appendChild(circle(cols.fill, cols.stroke, '1.5'));
-
-    // Vinkel: +MAX→0°(uppåt), 0→90°(höger), -MAX→180°(nedåt)
-    const clamp = Math.max(-MAX, Math.min(MAX, v));
-    const deg   = 90 - (clamp / MAX) * 90;
-
-    const arrowLen = sz * 0.28;
-    const headLen  = sz * 0.13;
-    const headW    = sz * 0.11;
-    const path = svgEl('path', {
-      d: `M ${cx} ${cx + arrowLen}
-          L ${cx} ${cx - arrowLen + headLen}
-          M ${cx - headW} ${cx - arrowLen + headLen}
-          L ${cx} ${cx - arrowLen}
-          L ${cx + headW} ${cx - arrowLen + headLen}`,
-      stroke: cols.stroke,
-      'stroke-width': Math.max(1.5, sz * 0.055),
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
-      fill: 'none',
-      transform: `rotate(${deg}, ${cx}, ${cx})`
-    });
-    svg.appendChild(path);
-    return svg;
-  }
-
+  const ctx = { svg, circle, text, arc, arcW, R, Ro, cx, sz, fs, fsS, fsXS };
+  const renderer = SVG_RENDERERS[type];
+  if (renderer) renderer(data, ctx);
   return svg;
 }
 
