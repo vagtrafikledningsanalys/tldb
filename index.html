@@ -2384,21 +2384,30 @@ const countyToName = no => COUNTY[no]      ?? `Län ${no}`;
 const countyToTC   = no => TC_MAP[no]      ?? 'Okänd TC';
 
 
-const DEFAULT_DATA = {
-  // Starttillstånd för alla regioner – live-data från LIVEDATA vinner via Object.assign
-  norra:     { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-  mellersta: { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-  ostra:     { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-  vastra:    { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-  sydostra:  { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-  sodra:     { smhi:null, olyckor:null, storningar:null, trafik:null, vaglag:null, tomtom:null,
-               waze:null, koll:null, mcsTrend:null, vagarbeten:0 },
-};
+// Starttillstånd för en region – enda stället där LIVEDATA-fältlistan definieras.
+// Alla fält som skrivs till LIVEDATA måste finnas här, annars riskerar
+// Object.assign i buildAll/omrUpdate att läsa undefined istället för null.
+function makeRegionState() {
+  return {
+    smhi:      null,
+    olyckor:   null,
+    storningar:null,
+    trafik:    null,
+    vaglag:    null,
+    tomtom:    null,
+    waze:      null,
+    wazeTs:    null,
+    koll:      null,
+    mcsTrend:  null,
+    vagarbeten:0,
+  };
+}
+
+// DEFAULT_DATA används som fallback i Object.assign – genereras från CONFIG.regioner
+// så att listan aldrig kan glida isär från LIVEDATA-strukturen.
+const DEFAULT_DATA = Object.fromEntries(
+  CONFIG.regioner.map(r => [r.id, makeRegionState()])
+);
 
 /* ═══════════════════════════════════════════════════════════════
    FÄRGHJÄLPARE – mjuk HSL-gradient grön→gul→orange→röd
@@ -2991,7 +3000,6 @@ async function fetchRoadCondition() {
 
     // Skriv medelvärde (en decimal) till LIVEDATA per region
     CONFIG.regioner.forEach(r => {
-      if (!LIVEDATA[r.id]) LIVEDATA[r.id] = {};
       if (cnts[r.id] > 0) {
         // En decimal, begränsat till [1.0, 4.0]
         const avg = Math.min(Math.max(sums[r.id] / cnts[r.id], 1.0), 4.0);
@@ -3458,7 +3466,6 @@ async function fetchFlowAll() {
       while (speedHistory[key].length && speedHistory[key][0].ts < cutoff) speedHistory[key].shift();
 
       const t15 = speedTrend(key, 15);  // regression på senaste 15 punkter
-      if (!LIVEDATA[key]) LIVEDATA[key] = {};
       // t15 är null de första 15 minuterna – visa … tills historik finns
       LIVEDATA[key].mcsTrend = t15;
     });
@@ -3479,7 +3486,9 @@ async function fetchFlowAll() {
    LIVEDATA — åsidosätter DEFAULT_DATA när riktig data finns.
    Fylls på av updateOverview() efter varje datahämtning.
    ═══════════════════════════════════════════════════════════════ */
-const LIVEDATA = {};   // { regionId: { smhi, olyckor, storningar, … } }
+const LIVEDATA = Object.fromEntries(
+  CONFIG.regioner.map(r => [r.id, makeRegionState()])
+);
 
 /* ── D1-loggning ── */
 // Skicka en snapshot per region till D1 var 5:e minut
@@ -3538,8 +3547,6 @@ function updateOverview() {
 
   CONFIG.regioner.forEach(regionCfg => {
     const id = regionCfg.id;
-    if (!LIVEDATA[id]) LIVEDATA[id] = {};
-
     /* ── SMHI: högsta varningsnivå för regionen ── */
     if (smhiFetched) {
       const regionWarnings = smhiData.filter(w => w.cos.includes(id));
@@ -4352,7 +4359,6 @@ async function fetchAllWaze() {
   await Promise.all(wazeRegions.map(async r => {
     const result = await fetchWazeRegion(r.id, r.wazeUrl);
     if (result) {
-      if (!LIVEDATA[r.id]) LIVEDATA[r.id] = {};
       LIVEDATA[r.id].waze   = result;
       LIVEDATA[r.id].wazeTs = Date.now();
       if (document.getElementById('tab-oversikt')?.classList.contains('active')) buildAll();
@@ -5027,7 +5033,6 @@ function ttCalcRegionWDI(regionIds) {
 function ttUpdateLivedataWDI() {
   CONFIG.regioner.forEach(reg => {
     const wdi = ttCalcRegionWDI([reg.id]);
-    if (!LIVEDATA[reg.id]) LIVEDATA[reg.id] = {};
     LIVEDATA[reg.id].tomtom = wdi;
   });
 }
