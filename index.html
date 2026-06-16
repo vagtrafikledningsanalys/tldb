@@ -2192,6 +2192,8 @@ html,body{
 </div>
 <script>
 
+const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev';
+
 /* ═══════════════════════════════════════════════════════════════
    INSTÄLLNINGAR – Justera gränsvärden och regionkonfiguration här
    ═══════════════════════════════════════════════════════════════ */
@@ -2281,10 +2283,10 @@ const CONFIG = {
   regioner: [
     { id:'norra',     namn:'Norra',     harWaze:false, harKoll:false, harMCS:false },
     { id:'mellersta', namn:'Mellersta', harWaze:false, harKoll:false, harMCS:false },
-    { id:'ostra',     namn:'Östra',     harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/ostra', harKoll:true,  harMCS:true  },
-    { id:'vastra',    namn:'Västra',    harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/vastra', harKoll:false, harMCS:true  },
+    { id:'ostra',     namn:'Östra',     harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/ostra`,  harKoll:true,  harMCS:true  },
+    { id:'vastra',    namn:'Västra',    harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/vastra`, harKoll:false, harMCS:true  },
     { id:'sydostra',  namn:'Sydöstra',  harWaze:false, harKoll:false, harMCS:false },
-    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/waze/sodra', harKoll:false, harMCS:false },
+    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/sodra`,  harKoll:false, harMCS:false },
   ]
 };
 
@@ -3013,7 +3015,6 @@ async function fetchRoadCondition() {
 const speedHistory = { vastra:[], ostra:[] };
 const speedHistoryStart = { vastra:null, ostra:null };
 const SPEED_HIST_MAX = 30 * 60_000;
-const PROXY_BASE = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev';
 
 /* ═══════════════════════════════════════════════════════════════════
    BASELINE – normalvärden per kvartsindex, län och helg/vardag
@@ -3846,7 +3847,7 @@ async function ktLoadAll() {
    flikbesök. Uppdateras automatiskt var 2:e minut.
    ═══════════════════════════════════════════════════════════════ */
 
-const API_URL  = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket';
+const API_URL  = `${PROXY_BASE}/trafikverket`;
 const AUTH_KEY = API_KEYS.trafikverket;
 
 const MS_PER_HOUR = 3_600_000;
@@ -5943,7 +5944,7 @@ function renderMCSGauges() {
    Lazy-initieras när Restids-fliken öppnas första gången.
    ═══════════════════════════════════════════════════════════════ */
 
-const TT_BASE_URL = 'https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/tomtom';
+const TT_BASE_URL = `${PROXY_BASE}/tomtom`;
 
 const ttState = {
   routes:           [],
@@ -6490,7 +6491,7 @@ function ttToggleDetails(routeId) {
 // ── fetchTrafikverket för Restid — använder CO_XML från tldb2 ─────
 async function ttFetchTrafikverket() {
   try {
-    const res = await fetch('https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket', {
+    const res = await fetch(`${PROXY_BASE}/trafikverket`, {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML
     });
     if (!res.ok) return;
@@ -6524,7 +6525,7 @@ async function ttFetchTrafikverket() {
 // ── Hämta vägarbeten (ManagedCause=true, SeverityCode>2) ────────────
 async function ttFetchVagarbeten() {
   try {
-    const res = await fetch('https://trafikdashboard-proxy.trafikanalys-vagtrafikledning.workers.dev/trafikverket', {
+    const res = await fetch(`${PROXY_BASE}/trafikverket`, {
       method: 'POST', headers: { 'Content-Type': 'text/xml' }, body: CO_XML_VAGARBETE
     });
     if (!res.ok) return;
