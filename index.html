@@ -2238,6 +2238,9 @@ const CONFIG = {
     wazeMaxAge:     10 * 60_000,   // 10 min – gråa ut Waze om ingen ny data
     smhi:           15 * 60_000,   // 15 min – SMHI vädervarningar
     kollektivtrafik: 1 * 60_000,   //  1 min – kollektivtrafik SL
+    tomtom:          1 * 60_000,   //  1 min – Restid ruttövervakning
+    loggning:        5 * 60_000,   //  5 min – klientloggning till D1
+    loggningDelay:   2 * 60_000,   //  2 min – fördröjning innan första loggning
   },
 
   /* ── MCS Hastighetsmätare ─────────────────────────────────────
@@ -3514,11 +3517,11 @@ async function logSnapshot() {
   }
 }
 
-// Starta loggning efter 2 min (låt data hinna laddas), sedan var 5:e minut
+// Starta loggning efter CONFIG.interval.loggningDelay, sedan var CONFIG.interval.loggning
 setTimeout(() => {
   logSnapshot();
-  setInterval(logSnapshot, 5 * 60 * 1000);
-}, 2 * 60 * 1000);
+  setInterval(logSnapshot, CONFIG.interval.loggning);
+}, CONFIG.interval.loggningDelay);
 
 /**
  * Räknar om SMHI-nivå, olyckor och incidenter per region ur live-källorna
@@ -6649,7 +6652,7 @@ function ttInit() {
   if (!ttState.initialized) {
     ttState.initialized = true;
     ttLoadRoutes();
-    _ttInterval = setInterval(ttLoadRoutes, 60000);
+    _ttInterval = setInterval(ttLoadRoutes, CONFIG.interval.tomtom);
   }
 }
 
