@@ -6465,45 +6465,46 @@ async function ttFetchVagarbeten() {
   updateOverview();
 }
 
-async function ttFetchDetails(routeId) {
-  const key = API_KEYS.tomtom;
-  if (!key) return;
-  try {
-    const res = await fetch(`${TT_BASE_URL}/routes/${routeId}/details`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const segs = data.detailedSegments || [];
-    ttState.segmentsCache.set(routeId, segs);
-    // Bygg shape-cache direkt så ttResolveIncidents kan använda den
-    ttBuildShapeCache(routeId, segs);
-    // Ingen DOM-rendering här – sker samlat i ttLoadRoutes efter ttResolveIncidents
-  } catch (e) { /* skip */ }
-}
+// ttFetchDetails() togs bort – details hämtas nu via Cron + KV-snapshot
+// i workern och levereras samlat via /tomtom/snapshot.
 
 async function ttLoadRoutes() {
-  const key = API_KEYS.tomtom;
-  if (!key) {
-    document.getElementById('tt-routeList').innerHTML =
-      `<div class="tt-nokey"><div class="tt-nokey-icon">🔑</div><span>Ingen API-nyckel för restid konfigurerad.<br>Fyll i <code>API_KEYS.tomtom</code> i skriptet.</span></div>`;
-    document.getElementById('tt-routeCount').textContent = 'ingen nyckel';
-    return;
-  }
   const btn = document.getElementById('tt-refreshBtn');
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
   // OBS: Töm INTE caches här — det skulle göra Live Map svart i 3–5 sek
-  // medan ttFetchDetails kör. Nya data skriver över per routeId, och
+  // medan details laddas. Nya data skriver över per routeId, och
   // bortplockade rutter städas bort efteråt (se nedan).
   ttSegBarState.clear();
   try {
-    const res = await fetch(`${TT_BASE_URL}/routes`);
+    // Hämta sammanslaget snapshot från KV via workern (ett anrop per cykel).
+    // Workern pollar TomTom var 5:e minut via Cron Trigger och lagrar i KV.
+    const res = await fetch(`${PROXY_BASE}/tomtom/snapshot`);
+    if (res.status === 503) {
+      // Workerns cron har inte kört än (första starten)
+      document.getElementById('tt-routeList').innerHTML =
+        `<div class="tt-nokey"><div class="tt-nokey-icon">⏳</div><span>Trafikdata laddas in – försök igen om en stund.</span></div>`;
+      document.getElementById('tt-routeCount').textContent = 'initierar…';
+      return;
+    }
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    ttState.routes = Array.isArray(data) ? data : (data.routes || []);
+    const snapshot = await res.json();
+
+    ttState.routes = Array.isArray(snapshot.routes) ? snapshot.routes : [];
+
     // Städa cache-poster för routeIds som inte längre finns i nya datan
     const _liveIds = new Set(ttState.routes.map(r => r.routeId));
     for (const m of [ttState.routeShapeCache, ttState.routeLanCache, ttState.segmentsCache]) {
       for (const k of m.keys()) if (!_liveIds.has(k)) m.delete(k);
     }
+
+    // Populera segmentsCache och bygg shape-cache från snapshot.details
+    const detailsMap = snapshot.details || {};
+    for (const [routeIdStr, segs] of Object.entries(detailsMap)) {
+      const routeId = +routeIdStr; // KV-nycklar är strängar, routeId är nummer
+      ttState.segmentsCache.set(routeId, segs);
+      ttBuildShapeCache(routeId, segs);
+    }
+
     ttRenderRoutes(ttState.routes);
     // Uppdatera Live Map om den är aktiv
     if (document.getElementById('tab-livemap')?.classList.contains('active')) lmRefresh();
@@ -6515,19 +6516,11 @@ async function ttLoadRoutes() {
     await ttFetchTrafikverket();
     await ttFetchVagarbeten();
 
-    // Hämta details i batchar om 10 med 200ms paus emellan för att
-    // undvika rate limiting (46 simultana requests triggar HTTP 429)
-    const activeRoutes = ttState.routes.filter(r => r.routeStatus === 'ACTIVE');
-    const BATCH = 10;
-    for (let i = 0; i < activeRoutes.length; i += BATCH) {
-      await Promise.all(activeRoutes.slice(i, i + BATCH).map(r => ttFetchDetails(r.routeId)));
-      if (i + BATCH < activeRoutes.length) await new Promise(r => setTimeout(r, 200));
-    }
     ttResolveIncidents();
 
     // Rendera bar + incident-pins för alla aktiva rutter nu när både segment-
     // data och incidents är klara — för BÅDE Restids-fliken och Område-fliken.
-    // Samma loop, samma tidpunkt, precis som Restids-flikens bars.
+    // Samma loop, samma tidpunkt, precis som tidigare.
     for (const r of ttState.routes.filter(r => r.routeStatus === 'ACTIVE')) {
       // Restids-fliken
       const ttBarEl = document.getElementById('tt-segbar-' + r.routeId);
