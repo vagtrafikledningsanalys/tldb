@@ -231,6 +231,44 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   font-size:12px;font-weight:700;min-width:46px;
   text-align:right;flex-shrink:0;align-self:center;
 }
+/* ── Compact tile-grid: rutter utan segmentdata ── */
+.omr-tt-compact-section{
+  margin-top:10px;flex-shrink:0;
+}
+.omr-tt-compact-label{
+  font-size:10px;letter-spacing:0.1em;text-transform:uppercase;
+  color:#3a4050;margin-bottom:5px;padding-left:2px;
+}
+.omr-tt-compact-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  gap:1px;
+  background:#1a1e2a;
+  border:1px solid #1a1e2a;
+  border-radius:7px;
+  overflow:hidden;
+}
+.omr-tt-tile{
+  background:#0e1018;
+  padding:7px 10px 6px;
+  display:flex;flex-direction:column;gap:5px;
+  min-width:0;
+}
+.omr-tt-tile-name{
+  font-size:10px;color:#4a5060;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.omr-tt-tile-bottom{
+  display:flex;align-items:center;justify-content:space-between;gap:4px;
+}
+.omr-tt-tile-delay{
+  font-size:14px;font-weight:700;
+}
+.omr-tt-tile-dot{
+  width:5px;height:5px;border-radius:50%;flex-shrink:0;
+}
+.omr-tt-tile-dot.dot-active{ background:#2ecc71;box-shadow:0 0 3px #2ecc71; }
+.omr-tt-tile-dot.dot-inactive{ background:#2a2e3a; }
 .omr-top5-header{
   display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-shrink:0;
 }
@@ -4941,6 +4979,20 @@ function ttUpdateLivedataWDI() {
   });
 }
 
+// Hjälp: delay-sortering fallande, rutter utan delay-data sist.
+function _ttSortByDelay(arr) {
+  return [...arr].sort((a, b) => {
+    if (a.routeStatus === 'ACTIVE' && b.routeStatus !== 'ACTIVE') return -1;
+    if (b.routeStatus === 'ACTIVE' && a.routeStatus !== 'ACTIVE') return 1;
+    const da = ttRouteDelay(a);
+    const db = ttRouteDelay(b);
+    if (da == null && db == null) return 0;
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return db - da;
+  });
+}
+
 function buildOmrTomTom(type, id) {
   const el = document.getElementById('omr-tt-list');
   if (!el) return;
@@ -4972,44 +5024,48 @@ function buildOmrTomTom(type, id) {
     return;
   }
 
-  // Sortera: aktiva först, sedan WDI fallande
-  routes.sort((a, b) => {
-    if (a.routeStatus === 'ACTIVE' && b.routeStatus !== 'ACTIVE') return -1;
-    if (b.routeStatus === 'ACTIVE' && a.routeStatus !== 'ACTIVE') return 1;
-    const da = ttRouteDelay(a) ?? -Infinity;
-    const db = ttRouteDelay(b) ?? -Infinity;
-    return db - da;
-  });
+  // Dela upp: details-rutter sorterade fallande, max 8 visas som rader.
+  // Övriga (inkl. details-rutter rangordnade 9+) hamnar i tile-grid.
+  const withDetails    = _ttSortByDelay(routes.filter(r => r._hasDetails));
+  const detailRows     = withDetails.slice(0, 8);
+  const detailOverflow = withDetails.slice(8);
+  const noDetails      = _ttSortByDelay(routes.filter(r => !r._hasDetails));
+  const tileRoutes     = _ttSortByDelay([...detailOverflow, ...noDetails]);
 
-  // Kontrollera om ruttlistan är identisk med förra rendringen –
-  // om ja, patcha bara delay-text och bars in-place utan innerHTML-svep.
-  // Jämför SORTERADE id:n (som Restids-fliken) så att ändrad sorteringsordning
-  // vid nya delay-värden inte triggar onödig full rebuild.
+  // Kontrollera om ruttuppsättningen är identisk med förra rendringen.
+  // Om ja – patcha bara delay-text in-place utan innerHTML-svep.
   const currentIds = routes.map(r => r.routeId).sort().join(',');
   const prevIds    = el.dataset.routeIds || '';
 
   if (currentIds === prevIds) {
-    // Samma rutter – patcha delay-text och re-rendera bars
-    for (const r of routes) {
+    // Patcha delay-text i rader
+    for (const r of detailRows) {
       const delay    = ttRouteDelay(r);
       const delayCls = delay == null ? 'tt-wdi-na' : delay <= 5 ? 'tt-wdi-ok' : delay <= 20 ? 'tt-wdi-warn' : 'tt-wdi-bad';
       const delayTxt = delay != null ? (delay > 0 ? '+' : '') + delay + '%' : '—';
       const delayEl  = document.getElementById('omr-tt-delay-' + r.routeId);
-      if (delayEl) {
-        delayEl.textContent = delayTxt;
-        delayEl.className   = 'omr-tt-delay ' + delayCls;
-      }
+      if (delayEl) { delayEl.textContent = delayTxt; delayEl.className = 'omr-tt-delay ' + delayCls; }
+    }
+    // Patcha delay-text i tiles
+    for (const r of tileRoutes) {
+      const delay    = ttRouteDelay(r);
+      const delayCls = delay == null ? 'tt-wdi-na' : delay <= 5 ? 'tt-wdi-ok' : delay <= 20 ? 'tt-wdi-warn' : 'tt-wdi-bad';
+      const delayTxt = delay != null ? (delay > 0 ? '+' : '') + delay + '%' : '—';
+      const delayEl  = document.getElementById('omr-tt-tile-delay-' + r.routeId);
+      if (delayEl) { delayEl.textContent = delayTxt; delayEl.className = 'omr-tt-tile-delay ' + delayCls; }
     }
     return;
   }
 
   // Ny ruttlista – full rebuild
   el.dataset.routeIds = currentIds;
-  el.innerHTML = routes.map(r => {    const delay = ttRouteDelay(r);
-    const delayCls = delay == null ? 'tt-wdi-na' : delay <= 5 ? 'tt-wdi-ok' : delay <= 20 ? 'tt-wdi-warn' : 'tt-wdi-bad';
-    const delayTxt = delay != null ? (delay > 0 ? '+' : '') + delay + '%' : '—';
-    const displayName = (r.routeName || r.routeId).replace(/^\d{1,2}_/, '');
 
+  // ── Sektion 1: details-rader (max 8) ──
+  const rowsHtml = detailRows.map(r => {
+    const delay      = ttRouteDelay(r);
+    const delayCls   = delay == null ? 'tt-wdi-na' : delay <= 5 ? 'tt-wdi-ok' : delay <= 20 ? 'tt-wdi-warn' : 'tt-wdi-bad';
+    const delayTxt   = delay != null ? (delay > 0 ? '+' : '') + delay + '%' : '—';
+    const displayName = (r.routeName || r.routeId).replace(/^\d{1,2}_/, '');
     return `<div class="omr-tt-row">
       <div style="min-width:0">
         <div class="omr-tt-name" title="${ttEsc(r.routeName || r.routeId)}">${ttEsc(displayName)}</div>
@@ -5024,9 +5080,32 @@ function buildOmrTomTom(type, id) {
     </div>`;
   }).join('');
 
-  // DOM finns nu – rendera bars från cache direkt så de syns omedelbart
-  // utan att vänta på nästa ttLoadRoutes-cykel (en minut)
-  for (const r of routes) {
+  // ── Sektion 2: tile-grid (övriga) ──
+  const tilesHtml = tileRoutes.length ? `
+    <div class="omr-tt-compact-section">
+      <div class="omr-tt-compact-label">Övriga rutter</div>
+      <div class="omr-tt-compact-grid">
+        ${tileRoutes.map(r => {
+          const delay      = ttRouteDelay(r);
+          const delayCls   = delay == null ? 'tt-wdi-na' : delay <= 5 ? 'tt-wdi-ok' : delay <= 20 ? 'tt-wdi-warn' : 'tt-wdi-bad';
+          const delayTxt   = delay != null ? (delay > 0 ? '+' : '') + delay + '%' : '—';
+          const displayName = (r.routeName || r.routeId).replace(/^\d{1,2}_/, '');
+          const dotCls     = r.routeStatus === 'ACTIVE' ? 'dot-active' : 'dot-inactive';
+          return `<div class="omr-tt-tile">
+            <div class="omr-tt-tile-name" title="${ttEsc(r.routeName || r.routeId)}">${ttEsc(displayName)}</div>
+            <div class="omr-tt-tile-bottom">
+              <span class="omr-tt-tile-delay ${delayCls}" id="omr-tt-tile-delay-${r.routeId}">${ttEsc(delayTxt)}</span>
+              <div class="omr-tt-tile-dot ${dotCls}"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  el.innerHTML = rowsHtml + tilesHtml;
+
+  // DOM finns nu – rendera bars från cache för details-rader
+  for (const r of detailRows) {
     if (r.routeStatus !== 'ACTIVE') continue;
     const barEl = document.getElementById('omr-tt-segbar-' + r.routeId);
     const conEl = document.getElementById('omr-tt-segcontainer-' + r.routeId);
@@ -6303,7 +6382,7 @@ function ttRenderRouteCard(r, idx) {
     </div>
   </div>
   <div class="tt-route-details" id="tt-details-${r.routeId}">${ttBuildDetails(r)}</div>
-  ${r.routeStatus === 'ACTIVE' ? `
+  ${r.routeStatus === 'ACTIVE' && r._hasDetails ? `
   <div class="tt-seg-row">
     <div class="tt-seg-bar-container" id="tt-segcontainer-${r.routeId}">
       <div class="tt-seg-bar-wrap tt-loading" id="tt-segbar-${r.routeId}"></div>
@@ -6503,6 +6582,12 @@ async function ttLoadRoutes() {
       const routeId = +routeIdStr; // KV-nycklar är strängar, routeId är nummer
       ttState.segmentsCache.set(routeId, segs);
       ttBuildShapeCache(routeId, segs);
+    }
+
+    // Märk varje rutt med _hasDetails så render-funktioner vet om
+    // segmentbar ska visas eller ej.
+    for (const r of ttState.routes) {
+      r._hasDetails = ttState.segmentsCache.has(r.routeId);
     }
 
     ttRenderRoutes(ttState.routes);
