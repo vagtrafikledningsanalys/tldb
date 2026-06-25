@@ -2153,6 +2153,8 @@ html,body{
       <div class="kt-grid" id="kt-pgrid"></div>
       <div class="kt-sec-label">Buss 1–6</div>
       <div class="kt-grid" id="kt-bgrid"></div>
+      <div class="kt-sec-label">Trafiklab – Rikshållplatser</div>
+      <div class="kt-grid" id="kt-tlab-grid"></div>
       <div class="kt-detail-panel" id="kt-panel" style="display:none">
         <div class="kt-ptitle" id="kt-ptitle"></div>
         <div class="kt-psite" id="kt-psite"></div>
@@ -2281,6 +2283,7 @@ const CONFIG = {
     smhi:           15 * 60_000,   // 15 min – SMHI vädervarningar
     kollektivtrafik: 1 * 60_000,   //  1 min – kollektivtrafik SL
     tomtom:          5 * 60_000,   //  5 min – Restid ruttövervakning
+    trafiklab:       5 * 60_000,   //  5 min – Trafiklab kollektivtrafik
     loggning:        5 * 60_000,   //  5 min – klientloggning till D1
     loggningDelay:   2 * 60_000,   //  2 min – fördröjning innan första loggning
   },
@@ -2327,11 +2330,11 @@ const CONFIG = {
   /* ── Regionkonfiguration ──────────────────────────────────── */
   regioner: [
     { id:'norra',     namn:'Norra',     harWaze:false, harKoll:false, harMCS:false },
-    { id:'mellersta', namn:'Mellersta', harWaze:false, harKoll:false, harMCS:false },
+    { id:'mellersta', namn:'Mellersta', harWaze:false, harKoll:true,  harMCS:false },
     { id:'ostra',     namn:'Östra',     harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/ostra`,  harKoll:true,  harMCS:true  },
     { id:'vastra',    namn:'Västra',    harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/vastra`, harKoll:false, harMCS:true  },
-    { id:'sydostra',  namn:'Sydöstra',  harWaze:false, harKoll:false, harMCS:false },
-    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/sodra`,  harKoll:false, harMCS:false },
+    { id:'sydostra',  namn:'Sydöstra',  harWaze:false, harKoll:true,  harMCS:false },
+    { id:'sodra',     namn:'Södra',     harWaze:true,  wazeUrl:`${PROXY_BASE}/waze/sodra`,  harKoll:true,  harMCS:false },
   ]
 };
 
@@ -2341,12 +2344,6 @@ const CONFIG = {
    inte används ännu – datahämtning för den källan hoppas över.
    ═══════════════════════════════════════════════════════════════ */
 const API_KEYS = {
-  /* Trafikverkets öppna API (nvdb, störningar, väglag m.m.) */
-  trafikverket: '__TRAFIKVERKET_KEY__',
-
-  /* Restid API (route monitoring) */
-  tomtom: '__TOMTOM_KEY__',
-
   /* Waze for Cities / CCP-feed (om nyckel krävs) */
   waze: '',
 
@@ -2362,9 +2359,10 @@ const API_KEYS = {
   // vasttrafik: '',
 };
 
-// Härledda konstanter från API_KEYS – används genomgående i fetch-anrop
+// Trafikverket-nyckeln injiceras av Cloudflare Worker (env.TRAFIKVERKET_KEY).
+// Platshållaren skickas med i XML-bodyn och ersätts server-side – aldrig exponerad.
 const API_URL  = `${PROXY_BASE}/trafikverket`;
-const AUTH_KEY = API_KEYS.trafikverket;
+const AUTH_KEY = '__TRAFIKVERKET_KEY__';
 
 /* ═══════════════════════════════════════════════════════════════
    GEOGRAFIDEFINITIONER
@@ -3622,6 +3620,23 @@ const KT_BUS = [
 ];
 const KT_ALL_SL = [...KT_METRO, ...KT_PENDEL, ...KT_BUS];
 
+/* ── Trafiklab rikshållplatser ─────────────────────────────────────── */
+const TLAB_STOPS = [
+  { area_id: '740000009', name: 'Linköping C',  county: 5,  agencyFilter: 'Östgötatrafiken' },
+  { area_id: '740000007', name: 'Norrköping C', county: 5,  agencyFilter: 'Östgötatrafiken' },
+  { area_id: '740000005', name: 'Uppsala C',    county: 3,  agencyFilter: 'UL' },
+  { area_id: '740000003', name: 'Malmö C',      county: 12, agencyFilter: '' },
+  { area_id: '740000133', name: 'Örebro C',     county: 18, agencyFilter: 'Länstrafiken Örebro AB' },
+  { area_id: '740000020', name: 'Kalmar C',     county: 8,  agencyFilter: 'Kalmar Länstrafik' },
+  { area_id: '740098032', name: 'Jönköping C',  county: 6,  agencyFilter: 'Jönköpings Länstrafik' },
+];
+
+const tlabState = {
+  initialized: false,
+  cache: {},        // area_id → { departures[], stopAlerts[], fetchedAt: Date }
+  lineFilters: {},  // area_id → kommaseparerad sträng, t.ex. "410, E4"
+};
+
 let ktSlDepCache = {}, ktLineData = {}, ktActive = null;
 const ktState = { initialized: false };
 function ktInit() {
@@ -3800,6 +3815,192 @@ async function ktLoadAll() {
   if (dot) dot.className = 'kt-dot done';
   if (lbl) lbl.textContent = 'Uppdaterad ' + new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   TRAFIKLAB – Rikshållplatser
+   Hämtar avgångar via Cloudflare Worker-snapshot för 7 hållplatser
+   utanför Stockholm. Lazy-initierad vid sidstart.
+   ═══════════════════════════════════════════════════════════════ */
+
+function tlabFilterDeps(departures, stop) {
+  const filterLines = (tlabState.lineFilters[stop.area_id] || '')
+    .split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+  const agencyRaw = (stop.agencyFilter || '').trim().toLowerCase();
+
+  return departures.filter(dep => {
+    const originId = dep.route?.origin?.id;
+    const destId   = dep.route?.destination?.id;
+    const stopId   = dep.stop?.id;
+    if (originId === stopId && destId !== stopId) return false;
+    if (dep.is_realtime !== true) return false;
+    if (filterLines.length && !filterLines.includes((dep.route?.designation || '').toUpperCase())) return false;
+    if (agencyRaw && !(dep.agency?.name || '').toLowerCase().includes(agencyRaw)) return false;
+    return true;
+  });
+}
+
+function tlabUpdateLivedata() {
+  const sums = {}, counts = {};
+
+  for (const stop of TLAB_STOPS) {
+    const d = tlabState.cache[stop.area_id];
+    if (!d) continue;
+    const region = COUNTY_AREA[stop.county];
+    if (!region) continue;
+
+    const deps = tlabFilterDeps(d.departures, stop).filter(dep => dep.canceled !== true);
+    if (!deps.length) continue;
+
+    const avgSec = deps.reduce((acc, dep) =>
+      acc + (typeof dep.delay === 'number' ? dep.delay : 0), 0) / deps.length;
+    const avgMin = Math.round((avgSec / 60) * 10) / 10;
+
+    if (!sums[region]) { sums[region] = 0; counts[region] = 0; }
+    sums[region]  += avgMin;
+    counts[region]++;
+  }
+
+  for (const region of Object.keys(sums)) {
+    if (!LIVEDATA[region]) LIVEDATA[region] = makeRegionState();
+    LIVEDATA[region].koll = Math.round((sums[region] / counts[region]) * 10) / 10;
+  }
+}
+
+async function tlabLoadSnapshot() {
+  try {
+    const res = await fetch(`${PROXY_BASE}/trafiklab/snapshot`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const snapshot = await res.json();
+
+    for (const [area_id, stopData] of Object.entries(snapshot.stops || {})) {
+      tlabState.cache[area_id] = {
+        departures: stopData.departures || [],
+        stopAlerts: stopData.stopAlerts || [],
+        fetchedAt:  new Date(snapshot.fetchedAt),
+      };
+    }
+
+    tlabUpdateLivedata();
+
+    if (document.getElementById('tab-kollektivtrafik')?.classList.contains('active')) {
+      tlabRenderAll();
+    }
+
+    if (document.getElementById('tab-oversikt')?.classList.contains('active')) buildAll();
+  } catch (e) {
+    console.error('tlabLoadSnapshot fel:', e.message);
+  }
+}
+
+function tlabRenderAll() {
+  const grid = document.getElementById('kt-tlab-grid');
+  if (!grid) return;
+
+  grid.innerHTML = TLAB_STOPS.map(stop => {
+    const d = tlabState.cache[stop.area_id];
+    if (!d) {
+      return `<div class="kt-card">
+        <div class="kt-ctop">
+          <div class="kt-badge" style="background:#333;color:#aaa">${stop.name.split(' ')[0]}</div>
+          <div><div class="kt-cname">${stop.name}</div></div>
+        </div>
+        <div class="kt-cbot">
+          <div><div class="kt-bignum">–</div><div class="kt-numlabel">min snitt</div></div>
+          <div><span class="kt-pill kt-na">Laddar…</span></div>
+        </div>
+      </div>`;
+    }
+
+    const deps = tlabFilterDeps(d.departures, stop).filter(dep => dep.canceled !== true);
+    const avgMin = deps.length
+      ? Math.round((deps.reduce((acc, dep) => acc + (typeof dep.delay === 'number' ? dep.delay : 0), 0) / deps.length / 60) * 10) / 10
+      : null;
+
+    const filterVal = tlabState.lineFilters[stop.area_id] || '';
+
+    return `<div class="kt-card" onclick="tlabTogglePanel('${stop.area_id}')">
+      <div class="kt-ctop">
+        <div class="kt-badge" style="background:#1a6a8a;color:#fff">${stop.name.replace(' C','')}</div>
+        <div><div class="kt-cname">${stop.name}</div><div class="kt-csub">${stop.county === 5 ? 'Östgötatrafiken' : stop.agencyFilter || 'Trafiklab'}</div></div>
+      </div>
+      <div class="kt-cbot">
+        <div>
+          <div class="kt-bignum">${avgMin !== null ? avgMin.toFixed(1) : '–'}</div>
+          <div class="kt-numlabel">min snitt</div>
+        </div>
+        <div>${ktPillHtml(avgMin)}</div>
+      </div>
+      <div style="padding:4px 8px 6px;border-top:1px solid #1e1e1e" onclick="event.stopPropagation()">
+        <input type="text" placeholder="Linje-filter (t.ex. E4, 410)"
+          value="${filterVal}"
+          style="width:100%;background:#0e0e0e;border:1px solid #2a2a2a;color:#ccc;font-size:10px;padding:3px 6px;border-radius:4px;"
+          oninput="tlabState.lineFilters['${stop.area_id}']=this.value;tlabRenderPanel('${stop.area_id}')">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let _tlabActivePanel = null;
+
+function tlabTogglePanel(area_id) {
+  const panel = document.getElementById('kt-panel');
+  if (!panel) return;
+  if (_tlabActivePanel === area_id && panel.style.display === 'block') {
+    panel.style.display = 'none'; _tlabActivePanel = null; return;
+  }
+  _tlabActivePanel = area_id;
+  tlabRenderPanel(area_id);
+}
+
+function tlabRenderPanel(area_id) {
+  const panel = document.getElementById('kt-panel');
+  if (!panel) return;
+  const stop = TLAB_STOPS.find(s => s.area_id === area_id);
+  if (!stop) return;
+  const d = tlabState.cache[area_id];
+  if (!d) { panel.style.display = 'none'; return; }
+
+  document.getElementById('kt-ptitle').textContent = stop.name;
+  document.getElementById('kt-psite').textContent  = d.departures.length + ' avgångar totalt · snapshot ' + d.fetchedAt.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
+
+  const deps = tlabFilterDeps(d.departures, stop)
+    .slice(0, 12)
+    .sort((a, b) => new Date(a.scheduled) - new Date(b.scheduled));
+
+  if (!deps.length) {
+    document.getElementById('kt-pcontent').innerHTML = '<div class="kt-errmsg">Inga matchande avgångar.</div>';
+  } else {
+    document.getElementById('kt-pcontent').innerHTML = deps.map(dep => {
+      const delayMin = typeof dep.delay === 'number' ? Math.round(dep.delay / 60 * 10) / 10 : null;
+      const timeStr  = dep.is_realtime ? ktFmtISO(dep.realtime) : ktFmtISO(dep.scheduled);
+      let cls = 'kt-c-ok', txt = 'I tid';
+      if (dep.canceled) { cls = 'kt-c-bad'; txt = 'Inställd'; }
+      else if (delayMin !== null && delayMin >= 3) { cls = 'kt-c-bad';  txt = '+' + delayMin + ' min'; }
+      else if (delayMin !== null && delayMin >= 1) { cls = 'kt-c-warn'; txt = '+' + delayMin + ' min'; }
+      const desig = dep.route?.designation || '—';
+      const dir   = dep.route?.direction   || dep.route?.destination?.name || '—';
+      return `<div class="kt-drow">
+        <span class="kt-ddest" style="min-width:32px;font-weight:600">${desig}</span>
+        <span class="kt-ddest">${dir}</span>
+        <span class="kt-dtime">${timeStr}</span>
+        <span class="kt-ddelay ${cls}">${txt}</span>
+      </div>`;
+    }).join('');
+  }
+
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+let _tlabInterval = null;
+function tlabInit() {
+  if (!tlabState.initialized) {
+    tlabState.initialized = true;
+    tlabLoadSnapshot();
+    _tlabInterval = setInterval(tlabLoadSnapshot, CONFIG.interval.trafiklab);
+  }
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    STÖRNINGAR — Störningslista-fliken
@@ -6802,7 +7003,7 @@ document.querySelectorAll('.tab').forEach(tab => {
         fkShow('oversikt', firstBtn);
       }
     }
-    if (target === 'kollektivtrafik') ktInit();
+    if (target === 'kollektivtrafik') { ktInit(); tlabInit(); if (tlabState.initialized) tlabRenderAll(); }
     if (target === 'vadervarningar') smhiInit();
     if (target === 'livemap') { lmInit(); setTimeout(() => { if (lmMap) lmMap.invalidateSize(); }, 120); }
   });
@@ -6826,6 +7027,7 @@ window.addEventListener('resize', () => {
 const _smhiReady = fetchSMHI();
 const _tpReady   = fetchTPData();
 ktInit();
+tlabInit();
 wazeInit();
 vaglagInit();
 loadBaseline();
