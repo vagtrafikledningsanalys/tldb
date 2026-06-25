@@ -4113,13 +4113,16 @@ let tpDir        = -1;
 let _coAbort     = null;
 const tpModalCache = new Map(); // idx → rad för störningsfliken
 const omrModalCache = new Map(); // idx → rad för Område-fliken (topp-lista)
+let _enrichGeneration = 0; // ökas för varje fetchTPData-cykel; enrichAll ignorerar stale callbacks
 
 function tpInit() {
   if (!tpState.initialized) {
     tpState.initialized = true;
-    fetchTPData();
+    const p = fetchTPData();
     setInterval(fetchTPData, CONFIG.interval.storningar);
+    return p;
   }
+  return Promise.resolve();
 }
 
 /* ── Hjälpfunktioner ── */
@@ -4194,10 +4197,12 @@ async function fetchLanes(E,N){
   }catch{return null;}
 }
 
-async function enrichAll(items){
+async function enrichAll(items, signal){
   const C=10;
   for(let i=0;i<items.length;i+=C){
+    if(signal?.aborted)return;
     await Promise.all(items.slice(i,i+C).map(async item=>{
+      if(signal?.aborted)return;
       const c=parseCoords(item.dev?.Geometry?.SWEREF99TM);
       if(!c)return;
       const key=`${c.E},${c.N}`;
@@ -4205,10 +4210,12 @@ async function enrichAll(items){
         ({adt:item.adt,laneCount:item.laneCount}=_enrichCache.get(key));
       }else{
         [item.adt,item.laneCount]=await Promise.all([fetchADT(c.E,c.N),fetchLanes(c.E,c.N)]);
-        _enrichCache.set(key,{adt:item.adt,laneCount:item.laneCount});
+        // Skriv bara till cache om signalen inte abortats (undviker stale-writes)
+        if(!signal?.aborted) _enrichCache.set(key,{adt:item.adt,laneCount:item.laneCount});
       }
     }));
     // Rita om progressivt efter varje batch så ÅDT visas allt eftersom
+    if(signal?.aborted)return;
     if(document.getElementById('tab-storningar')?.classList.contains('active')) renderTPTable();
     omrUpdate();
   }
@@ -4237,6 +4244,7 @@ async function fetchTPData(){
   if(_coAbort)_coAbort.abort();
   _coAbort=new AbortController();
   const{signal}=_coAbort;
+  const gen=++_enrichGeneration; // unikt ID för denna cykel
 
   try{
     const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/xml'},body:CO_XML,signal});
@@ -4265,8 +4273,10 @@ async function fetchTPData(){
     updateOverview();
     if(lbl)lbl.textContent='Uppdaterad '+new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
 
-    // Berika med ÅDT asynkront
-    enrichAll(newData).then(()=>{
+    // Berika med ÅDT asynkront – skicka med signal och gen så stale körningar ignoreras
+    enrichAll(newData, signal).then(()=>{
+      // Om en ny cykel startats under tiden – ignorera detta resultat
+      if(gen!==_enrichGeneration)return;
       tpData=newData; tpFetch=Date.now();
       if(document.getElementById('tab-storningar')?.classList.contains('active'))renderTPTable();
       updateOverview();  // uppdatera igen när ÅDT-data är klar
@@ -7024,8 +7034,10 @@ window.addEventListener('resize', () => {
 
 // Hämta SMHI och störningsdata direkt så översikten får live-data utan att
 // användaren behöver öppna flikarna först.
+// Använd tpInit() istället för direkt fetchTPData() – annars startas ett andra
+// intervall första gången Störningslistan öppnas (tpState.initialized förblir false).
 const _smhiReady = fetchSMHI();
-const _tpReady   = fetchTPData();
+const _tpReady   = tpInit();
 ktInit();
 tlabInit();
 wazeInit();
