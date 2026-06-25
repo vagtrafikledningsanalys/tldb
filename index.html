@@ -299,9 +299,6 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .omr-top5-table th.col-age,
 .omr-top5-table th.col-rem,
 .omr-top5-table th.col-impact { text-align:center; }
-  text-align:center;color:#777;font-size:11px;letter-spacing:0.06em;
-  text-transform:uppercase;padding:20px!important;
-}
 .col-rank{width:1px;white-space:nowrap;color:#888!important;font-size:11px;font-weight:700;}
 .col-type{width:1px;white-space:nowrap;max-width:21ch;overflow:hidden;text-overflow:ellipsis;}
 .col-loc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -3319,7 +3316,14 @@ async function loadSpeedHistory() {
 // Spara historik till localStorage efter varje fetch
 function saveSpeedHistory() {
   try {
-    localStorage.setItem('speedHistory', JSON.stringify(speedHistory));
+    const now = Date.now();
+    const cutoff = now - SPEED_HIST_MAX;
+    // Trimma bort gamla punkter innan sparning – håller lagrad data minimal
+    const trimmed = {};
+    for (const key of ['vastra', 'ostra']) {
+      trimmed[key] = (speedHistory[key] || []).filter(p => p.ts > cutoff);
+    }
+    localStorage.setItem('speedHistory', JSON.stringify(trimmed));
   } catch (e) {
     console.warn('Kunde inte spara speedHistory till localStorage:', e);
   }
