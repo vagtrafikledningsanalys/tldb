@@ -4043,7 +4043,8 @@ const HOURLY_WE = [
 
 
 const tpState = { initialized: false };
-let tpData       = [];
+let tpData       = []; // störningar, olyckor, incidenter
+let tpVagarbeten = []; // vägarbeten — används av Live Map och KPI-cirkel, ej störningslistan
 let tpFetch      = null;
 let tpSort       = 'severity';
 let tpDir        = -1;
@@ -4117,8 +4118,9 @@ async function fetchTPData(){
     const res=await fetch(`${PROXY_BASE}/storningar/snapshot`,{signal});
     if(!res.ok)throw new Error(`HTTP ${res.status}`);
     const json=await res.json();
-    // Worker returnerar { fetchedAt, items } där items redan är berikade med adt + laneCount
+    // Worker returnerar { fetchedAt, items, vagarbeten } — separata arrayer
     tpData=json.items??[];
+    tpVagarbeten=json.vagarbeten??[];
     tpFetch=Date.now();
     renderTPTable();
     updateOverview();
@@ -6634,21 +6636,20 @@ function ttToggleDetails(routeId) {
 }
 
 // ── Bygg tvIncidents + tvVagarbeten från störningar-snapshot ─────────
-// tpData är redan populerat av fetchTPData() med berikad data från Worker.
+// tpData = störningar/olyckor/incidenter, tpVagarbeten = vägarbeten.
 // Inga extra Trafikverket-anrop behövs.
 function ttBuildFromSnapshot() {
   const incidents = [];
   const vagarbeten = [];
 
+  // Störningar → incidents
   for (const item of tpData) {
     const dev = item.dev;
     if (!dev) continue;
-
     const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
     if (!m) continue;
     if (String(dev.ManagedCause).toLowerCase() !== 'true') continue;
-
-    const base = {
+    incidents.push({
       lon:       +m[1],
       lat:       +m[2],
       code:      dev.MessageCode || '',
@@ -6659,24 +6660,34 @@ function ttBuildFromSnapshot() {
       roadBlocked: item.roadBlocked,
       countyNos: (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : [])
                    .map(v => String(v).split(',')[0]).filter(Boolean),
-    };
+      sitId:                   item.id || null,
+      startTime:               dev.StartTime || null,
+      endTime:                 dev.EndTime   || null,
+      numberOfLanesRestricted: dev.NumberOfLanesRestricted ?? null,
+    });
+  }
 
-    const type = (dev.MessageType || '').toLowerCase();
-    if (type === 'vägarbete') {
-      vagarbeten.push({
-        ...base,
-        severityText: dev.SeverityText || '',
-        roadNumber:   dev.RoadNumber   || '',
-      });
-    } else {
-      incidents.push({
-        ...base,
-        sitId:                   item.id || null,
-        startTime:               dev.StartTime || null,
-        endTime:                 dev.EndTime   || null,
-        numberOfLanesRestricted: dev.NumberOfLanesRestricted ?? null,
-      });
-    }
+  // Vägarbeten → vagarbeten
+  for (const item of tpVagarbeten) {
+    const dev = item.dev;
+    if (!dev) continue;
+    const m = dev.Geometry?.WGS84?.match(/(-?[\d.]+)\s+(-?[\d.]+)/);
+    if (!m) continue;
+    if (String(dev.ManagedCause).toLowerCase() !== 'true') continue;
+    vagarbeten.push({
+      lon:         +m[1],
+      lat:         +m[2],
+      code:        dev.MessageCode || '',
+      message:     dev.Message || '',
+      location:    dev.LocationDescriptor || '',
+      direction:   dev.AffectedDirectionValue || 'BothDirections',
+      lineVec:     ttParseLineVec(dev.Geometry?.Line?.WGS84),
+      roadBlocked: item.roadBlocked,
+      countyNos:   (Array.isArray(dev.CountyNo) ? dev.CountyNo : dev.CountyNo != null ? [dev.CountyNo] : [])
+                     .map(v => String(v).split(',')[0]).filter(Boolean),
+      severityText: dev.SeverityText || '',
+      roadNumber:   dev.RoadNumber   || '',
+    });
   }
 
   ttState.tvIncidents  = incidents;
