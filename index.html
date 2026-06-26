@@ -770,9 +770,6 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .adt-none{color:#666;}
 .lane-count-badge{background:#1a1a1a;border:1px solid #2a2a2a;color:#999;padding:2px 7px;border-radius:6px;font-size:11px;}
 .rem-badge{padding:2px 7px;border-radius:6px;font-size:11px;font-family:'DM Mono',ui-monospace,monospace;}
-.rem-short{background:rgba(192,26,26,0.12);color:#e04040;border:1px solid rgba(192,26,26,0.3);}
-.rem-mid  {background:rgba(208,96,0,0.12); color:#e08030;border:1px solid rgba(208,96,0,0.3);}
-.rem-long {background:#1a1a1a;color:#888;border:1px solid #2a2a2a;}
 .rem-done {background:#151515;color:#666;border:1px solid #222;}
 .rem-none {color:#666;}
 .cap-badge{padding:2px 7px;border-radius:6px;font-size:11px;font-weight:600;}
@@ -4099,7 +4096,45 @@ function adtClass(v){if(v==null)return'adt-none';return v>=20000?'adt-high':v>=5
 function sevClass(s){if(!s)return'sev-default';const l=s.toLowerCase();return l.includes('stor')?'sev-Stor':l.includes('medel')?'sev-Medel':l.includes('liten')?'sev-Liten':'sev-default';}
 function capClass(p){if(p==null)return'cap-none';return p===0?'cap-zero':p<=30?'cap-crit':p<=60?'cap-low':p<=80?'cap-mid':'cap-ok';}
 function fmtImpact(v){if(v==null)return{text:'—',cls:'imp-none'};if(v===0)return{text:'0',cls:'imp-none'};const t=Math.round(v).toLocaleString('sv-SE');const c=v>=10000?'imp-xhigh':v>=4000?'imp-high':v>=1000?'imp-mid':'imp-low';return{text:t,cls:c};}
-function fmtRemaining(e){if(!e)return{text:'—',cls:'rem-none'};const d=new Date(e);if(isNaN(d))return{text:'—',cls:'rem-none'};const ms=d-Date.now();if(ms<=0)return{text:'Avslutad',cls:'rem-done'};const m=Math.floor(ms/60000),h=Math.floor(m/60);if(h>=24)return{text:`${Math.floor(h/24)}d ${h%24}h`,cls:'rem-long'};if(h>0)return{text:`${h}h ${m%60}m`,cls:h<2?'rem-short':'rem-mid'};return{text:`${m}m`,cls:'rem-short'};}
+function fmtRemaining(e){
+  if(!e)return{text:'—',cls:'rem-none',style:''};
+  const d=new Date(e);
+  if(isNaN(d))return{text:'—',cls:'rem-none',style:''};
+  const ms=d-Date.now();
+  if(ms<=0)return{text:'Avslutad',cls:'rem-done',style:''};
+  const m=Math.floor(ms/60000),h=Math.floor(m/60);
+  const txt=h>=24?`${Math.floor(h/24)}d ${h%24}h`:h>0?`${h}h ${m%60}m`:`${m}m`;
+  // Steglös färgskala baserad på minuter kvar:
+  // 0–20m  → grönt  (#40c060)
+  // 20–40m → gult   (#c8c040)
+  // 40–60m → orange (#d07020)
+  // 60–90m → rött   (#c03030)
+  // >90m   → mörkrött (#901818)
+  let r,g,b;
+  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+  const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
+  if(m<=20){
+    // grönt
+    r=0x40;g=0xc0;b=0x60;
+  } else if(m<=40){
+    const t=clamp((m-20)/20,0,1);
+    r=lerp(0x40,0xc8,t);g=lerp(0xc0,0xc0,t);b=lerp(0x60,0x40,t);
+  } else if(m<=60){
+    const t=clamp((m-40)/20,0,1);
+    r=lerp(0xc8,0xd0,t);g=lerp(0xc0,0x70,t);b=lerp(0x40,0x20,t);
+  } else if(m<=90){
+    const t=clamp((m-60)/30,0,1);
+    r=lerp(0xd0,0xc0,t);g=lerp(0x70,0x30,t);b=lerp(0x20,0x30,t);
+  } else {
+    r=0x90;g=0x18;b=0x18;
+  }
+  const hex=v=>v.toString(16).padStart(2,'0');
+  const fg=`#${hex(r)}${hex(g)}${hex(b)}`;
+  const bg=`rgba(${r},${g},${b},0.10)`;
+  const border=`rgba(${r},${g},${b},0.28)`;
+  const style=`color:${fg};background:${bg};border:1px solid ${border};`;
+  return{text:txt,cls:'rem-badge',style};
+}
 
 /* ── Datahämtning ── */
 // Störningar hämtas nu från Worker-snapshot som redan innehåller ÅDT och körfält.
@@ -4244,7 +4279,7 @@ function renderTPTable(){
       <td class="time-mono">${regionStr}</td>
       <td class="time-mono">${fmt(dev.CreationTime)}</td>
       <td class="time-mono">${fmt(dev.EndTime)}</td>
-      <td><span class="rem-badge ${rem.cls}">${rem.text}</span></td>
+      <td><span class="rem-badge ${rem.cls}" style="${rem.style}">${rem.text}</span></td>
       <td>${pct!==null?`<span class="cap-badge ${capClass(pct)}">${pct}%</span>`:'<span class="td-dim">—</span>'}</td>
       <td><span class="imp-badge ${imp.cls}">${imp.text}</span></td>
     </tr>`;
@@ -4924,7 +4959,7 @@ function buildOmrTop5(type, id) {
       <td class="col-loc" title="${loc}">${loc}</td>
       <td class="col-lanes">${lanesHtml}</td>
       <td class="col-age"><span class="${age.cls}">${age.text}</span></td>
-      <td class="col-rem"><span class="rem-badge ${rem.cls}">${rem.text}</span></td>
+      <td class="col-rem"><span class="rem-badge ${rem.cls}" style="${rem.style}">${rem.text}</span></td>
       <td class="col-impact"><span class="omr-impact-val imp-badge ${imp.cls}">${imp.text}</span></td>`;
     newSnap.set(i, { key: row.id, html });
   });
