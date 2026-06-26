@@ -4764,24 +4764,18 @@ function omrRender() {
   // Bygg KPI-remsan — rAF säkerställer att strip har korrekt bredd
   requestAnimationFrame(() => buildOmrKpiStrip(cfg, data));
 
-  // Sverige-nivå: dölj restidsrutter, ge topplistan full plats med 10 händelser
+  // Visa restidsrutter och topp-5 på samma sätt för alla nivåer (inkl. Sverige)
   const ttWrap   = document.querySelector('.omr-tt-wrap');
   const top5Wrap = document.querySelector('.omr-top5-wrap');
-  if (type === 'sweden') {
-    if (ttWrap)   { ttWrap.style.display   = 'none'; }
-    if (top5Wrap) { top5Wrap.style.flex    = '1'; top5Wrap.style.maxHeight = 'none'; }
-    CONFIG.omrTopN = 10;
-  } else {
-    if (ttWrap)   { ttWrap.style.display   = ''; }
-    if (top5Wrap) { top5Wrap.style.flex    = ''; top5Wrap.style.maxHeight = ''; }
-    CONFIG.omrTopN = 5;
-  }
+  if (ttWrap)   { ttWrap.style.display   = ''; }
+  if (top5Wrap) { top5Wrap.style.flex    = ''; top5Wrap.style.maxHeight = ''; }
+  CONFIG.omrTopN = 5;
 
   // Bygg topp-N lista
   buildOmrTop5(type, id);
 
-  // Bygg restidsruttfältet (hoppas över om Sverige)
-  if (type !== 'sweden') buildOmrTomTom(type, id);
+  // Bygg restidsruttfältet för alla nivåer
+  buildOmrTomTom(type, id);
 }
 
 function buildOmrKpiStrip(cfg, data) {
@@ -5117,11 +5111,10 @@ function buildOmrTomTom(type, id) {
     return;
   }
 
-  // Dela upp: details-rutter sorterade fallande, max 8 visas som rader.
-  // Övriga (inkl. details-rutter rangordnade 9+) hamnar i tile-grid.
+  // Sverige-nivå: visa enbart tiles (rutor), inga segmentbars
   const withDetails    = _ttSortByDelay(routes.filter(r => r._hasDetails));
-  const detailRows     = withDetails.slice(0, 8);
-  const detailOverflow = withDetails.slice(8);
+  const detailRows     = type === 'sweden' ? [] : withDetails.slice(0, 8);
+  const detailOverflow = type === 'sweden' ? withDetails : withDetails.slice(8);
   const noDetails      = _ttSortByDelay(routes.filter(r => !r._hasDetails));
   const tileRoutes     = _ttSortByDelay([...detailOverflow, ...noDetails]);
 
@@ -5176,7 +5169,7 @@ function buildOmrTomTom(type, id) {
   // ── Sektion 2: tile-grid (övriga) ──
   const tilesHtml = tileRoutes.length ? `
     <div class="omr-tt-compact-section">
-      <div class="omr-tt-compact-label">Övriga rutter</div>
+      ${type !== 'sweden' ? '<div class="omr-tt-compact-label">Övriga rutter</div>' : ''}
       <div class="omr-tt-compact-grid">
         ${tileRoutes.map(r => {
           const delay      = ttRouteDelay(r);
