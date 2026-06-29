@@ -222,11 +222,6 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 }
 /* Klipp bara själva segment-barens färgblock, inte containers */
 .omr-tt-bar-wrap .tt-seg { overflow:hidden; }
-/* Incident-pinnar i Område-panelen */
-.omr-tt-bar-container .tt-incident-pin{
-  top:-12px;
-  font-size:17px;
-}
 .omr-tt-delay{
   font-size:12px;font-weight:700;min-width:46px;
   text-align:right;flex-shrink:0;align-self:center;
@@ -987,7 +982,7 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .tt-seg-row { display:flex; align-items:center; gap:10px; padding:0 1.4rem 8px; background:#111318; }
 .tt-seg-row .tt-seg-bar-container { flex:1; }
 .tt-route-delay { font-size:0.85rem; font-weight:800; min-width:42px; text-align:right; flex-shrink:0; }
-.tt-seg-bar-container { position:relative; width:100%; }
+.tt-seg-bar-container { position:relative; width:100%; overflow:visible; }
 .tt-seg-bar-wrap { height:6px; display:flex; width:100%; overflow:hidden; }
 .tt-seg-bar-wrap.tt-loading { background:#181c24; animation:tt-shimmer 1.5s infinite; border-radius:0; }
 @keyframes tt-shimmer { 0%,100%{opacity:1;}50%{opacity:0.4;} }
@@ -1007,20 +1002,25 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
 .tt-seg-legend-dot  { width:7px; height:7px; border-radius:2px; flex-shrink:0; }
 .tt-seg-legend-item.tt-incident-legend { margin-left:auto; }
 .tt-incident-pin {
-  position:absolute; top:-14px; transform:translateX(-50%);
-  font-size:20px; line-height:1; cursor:pointer; z-index:10;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,0.7)); transition:transform 0.15s;
+  position:absolute; bottom:0; transform:translateX(-50%);
+  cursor:pointer; z-index:10; display:flex; flex-direction:column; align-items:center;
+  transition:transform 0.15s;
 }
-.tt-incident-pin:hover { transform:translateX(-50%) scale(1.4); }
-/* Blockera inte pointer-events på barn-element (img) */
+.tt-incident-pin:hover { transform:translateX(-50%) scale(1.15); }
 .tt-incident-pin * { pointer-events:none; }
+.tt-pin-stem { width:2px; height:8px; background:#fff; border-radius:1px; flex-shrink:0; }
+.tt-pin-sign { display:block; filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
 .tt-upstream-delay-row {
   position: absolute;
-  top: -14px;
+  top: 8px;
   left: 0;
   width: 100%;
   height: 14px;
   pointer-events: none;
+  overflow: visible;
+}
+.omr-tt-bar-container .tt-upstream-delay-row {
+  top: 10px;
 }
 .tt-upstream-delay {
   position: absolute;
@@ -1028,7 +1028,7 @@ body.hide-tbd .omr-kpi-grp-label.grp-all-tbd { display:none; }
   font-size: 11px;
   color: #e8a020;
   letter-spacing: 0.03em;
-  transform: translateX(0);
+  transform: translateX(-50%);
   white-space: nowrap;
   pointer-events: none;
   z-index: 11;
@@ -1616,14 +1616,8 @@ html,body{
 .omr-tt-bar-wrap .tt-seg-nodata { background:rgba(255,255,255,.04); }
 
 /* Incident-pin — moderniserad */
-.omr-tt-bar-container .tt-incident-pin{
-  top:-16px !important;
-  font-size:15px !important;
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.7)) drop-shadow(0 0 6px rgba(26,173,235,.4));
-  transition:transform .18s ease;
-}
 .omr-tt-bar-container .tt-incident-pin:hover{
-  transform:translateX(-50%) scale(1.35) !important;
+  transform:translateX(-50%) scale(1.15) !important;
 }
 
 /* Loading shimmer — neutralare */
@@ -6336,45 +6330,46 @@ function ttResolveIncidents() {
 }
 function ttMatchIncidents(routeId) { return ttState.resolvedIncidents.get(routeId) || []; }
 
-const TT_SIGN_A41 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cG9seWdvbiBwb2ludHM9IjUwLDYgOTcsOTQgMyw5NCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjciIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8IS0tIENhciAxIChsZWZ0LCBkcml2aW5nIHJpZ2h0KSAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyMiw2MikiPgogICAgPHJlY3QgeD0iMCIgeT0iOCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjExIiByeD0iMiIgZmlsbD0iI2UwMCIvPgogICAgPHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjE0IiBoZWlnaHQ9IjkiIHJ4PSIxIiBmaWxsPSIjZTAwIi8+CiAgICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iNSIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2NjZSIvPgogICAgPHJlY3QgeD0iMTIiIHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjYiIHJ4PSIxIiBmaWxsPSIjY2NlIi8+CiAgICA8Y2lyY2xlIGN4PSI1IiBjeT0iMjAiIHI9IjMuNSIgZmlsbD0iIzIyMiIvPgogICAgPGNpcmNsZSBjeD0iNSIgY3k9IjIwIiByPSIxLjUiIGZpbGw9IiNhYWEiLz4KICAgIDxjaXJjbGUgY3g9IjE3IiBjeT0iMjAiIHI9IjMuNSIgZmlsbD0iIzIyMiIvPgogICAgPGNpcmNsZSBjeD0iMTciIGN5PSIyMCIgcj0iMS41IiBmaWxsPSIjYWFhIi8+CiAgPC9nPgogIDwhLS0gQ2FyIDIgKHJpZ2h0LCBkcml2aW5nIGxlZnQsIG1pcnJvcmVkKSAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3OCw2Mikgc2NhbGUoLTEsMSkiPgogICAgPHJlY3QgeD0iMCIgeT0iOCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjExIiByeD0iMiIgZmlsbD0iI2UwMCIvPgogICAgPHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjE0IiBoZWlnaHQ9IjkiIHJ4PSIxIiBmaWxsPSIjZTAwIi8+CiAgICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iNSIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2NjZSIvPgogICAgPHJlY3QgeD0iMTIiIHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjYiIHJ4PSIxIiBmaWxsPSIjY2NlIi8+CiAgICA8Y2lyY2xlIGN4PSI1IiBjeT0iMjAiIHI9IjMuNSIgZmlsbD0iIzIyMiIvPgogICAgPGNpcmNsZSBjeD0iNSIgY3k9IjIwIiByPSIxLjUiIGZpbGw9IiNhYWEiLz4KICAgIDxjaXJjbGUgY3g9IjE3IiBjeT0iMjAiIHI9IjMuNSIgZmlsbD0iIzIyMiIvPgogICAgPGNpcmNsZSBjeD0iMTciIGN5PSIyMCIgcj0iMS41IiBmaWxsPSIjYWFhIi8+CiAgPC9nPgogIDwhLS0gSW1wYWN0IGxpbmVzIC0tPgogIDxsaW5lIHgxPSI0OCIgeTE9IjYzIiB4Mj0iNDQiIHkyPSI1NyIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGxpbmUgeDE9IjUwIiB5MT0iNjEiIHgyPSI1MCIgeTI9IjU0IiBzdHJva2U9IiNlMDAiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8bGluZSB4MT0iNTIiIHkxPSI2MyIgeDI9IjU2IiB5Mj0iNTciIHN0cm9rZT0iI2UwMCIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4=';
-const TT_SIGN_A40 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cG9seWdvbiBwb2ludHM9IjUwLDYgOTcsOTQgMyw5NCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjciIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8cmVjdCB4PSI0NiIgeT0iMzgiIHdpZHRoPSI4IiBoZWlnaHQ9IjMwIiByeD0iMyIgZmlsbD0iIzFhMWExYSIvPgogIDxjaXJjbGUgY3g9IjUwIiBjeT0iODAiIHI9IjUiIGZpbGw9IiMxYTFhMWEiLz4KPC9zdmc+';
+const TT_SIGN_A41 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz4KICA8cG9seWdvbiBwb2ludHM9JzUwLDYgOTcsOTQgMyw5NCcgZmlsbD0nI2ZmZicgc3Ryb2tlPScjZTAwJyBzdHJva2Utd2lkdGg9JzcnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz4KICA8ZyB0cmFuc2Zvcm09J3RyYW5zbGF0ZSgzOCw2MCkgcm90YXRlKC00NSknPgogICAgPHJlY3QgeD0nLTknIHk9Jy01JyB3aWR0aD0nMTgnIGhlaWdodD0nOScgcng9JzInIGZpbGw9JyNlMDAnLz4KICAgIDxyZWN0IHg9Jy02JyB5PSctOScgd2lkdGg9JzEyJyBoZWlnaHQ9JzcnIHJ4PScxJyBmaWxsPScjZTAwJy8+CiAgICA8cmVjdCB4PSctNScgeT0nLTgnIHdpZHRoPSc0JyBoZWlnaHQ9JzUnIHJ4PScwLjUnIGZpbGw9JyNjY2UnLz4KICAgIDxyZWN0IHg9JzEnIHk9Jy04JyB3aWR0aD0nNCcgaGVpZ2h0PSc1JyByeD0nMC41JyBmaWxsPScjY2NlJy8+CiAgICA8Y2lyY2xlIGN4PSctNScgY3k9JzUnIHI9JzMnIGZpbGw9JyMyMjInLz4KICAgIDxjaXJjbGUgY3g9JzUnIGN5PSc1JyByPSczJyBmaWxsPScjMjIyJy8+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0ndHJhbnNsYXRlKDYyLDYwKSByb3RhdGUoNDUpJz4KICAgIDxyZWN0IHg9Jy05JyB5PSctNScgd2lkdGg9JzE4JyBoZWlnaHQ9JzknIHJ4PScyJyBmaWxsPScjZTAwJy8+CiAgICA8cmVjdCB4PSctNicgeT0nLTknIHdpZHRoPScxMicgaGVpZ2h0PSc3JyByeD0nMScgZmlsbD0nI2UwMCcvPgogICAgPHJlY3QgeD0nLTUnIHk9Jy04JyB3aWR0aD0nNCcgaGVpZ2h0PSc1JyByeD0nMC41JyBmaWxsPScjY2NlJy8+CiAgICA8cmVjdCB4PScxJyB5PSctOCcgd2lkdGg9JzQnIGhlaWdodD0nNScgcng9JzAuNScgZmlsbD0nI2NjZScvPgogICAgPGNpcmNsZSBjeD0nLTUnIGN5PSc1JyByPSczJyBmaWxsPScjMjIyJy8+CiAgICA8Y2lyY2xlIGN4PSc1JyBjeT0nNScgcj0nMycgZmlsbD0nIzIyMicvPgogIDwvZz4KICA8bGluZSB4MT0nNDgnIHkxPSc1NCcgeDI9JzQ0JyB5Mj0nNDgnIHN0cm9rZT0nI2UwMCcgc3Ryb2tlLXdpZHRoPScyLjUnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcvPgogIDxsaW5lIHgxPSc1MCcgeTE9JzUyJyB4Mj0nNTAnIHkyPSc0Nicgc3Ryb2tlPScjZTAwJyBzdHJva2Utd2lkdGg9JzIuNScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+CiAgPGxpbmUgeDE9JzUyJyB5MT0nNTQnIHgyPSc1NicgeTI9JzQ4JyBzdHJva2U9JyNlMDAnIHN0cm9rZS13aWR0aD0nMi41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz4KPC9zdmc+';
+const TT_SIGN_A40 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz4KICA8cG9seWdvbiBwb2ludHM9JzUwLDYgOTcsOTQgMyw5NCcgZmlsbD0nI2ZmZicgc3Ryb2tlPScjZTAwJyBzdHJva2Utd2lkdGg9JzcnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz4KICA8cmVjdCB4PSc0NicgeT0nMzQnIHdpZHRoPSc4JyBoZWlnaHQ9JzI4JyByeD0nMycgZmlsbD0nIzFhMWExYScvPgogIDxjaXJjbGUgY3g9JzUwJyBjeT0nNzYnIHI9JzUnIGZpbGw9JyMxYTFhMWEnLz4KPC9zdmc+';
 
 function ttIncidentIcon(code, roadBlocked) {
   const c = (code || '').toLowerCase();
-  const isOlycka   = c.includes('olycka');
+  const isOlycka    = c.includes('olycka');
   const isVagarbete = c.includes('vägarbete') || c.includes('vagarbete');
 
   if (roadBlocked) {
-    // Röd spärrbom med distinkt symbol per typ
-    if (isOlycka)    return ttBlockedIcon('olycka');
-    if (isVagarbete) return ttBlockedIcon('vagarbete');
-    return ttBlockedIcon('incident');
+    if (isOlycka)    return ttPinHtml(TT_BLOCKED_OLYCKA,    28, true);
+    if (isVagarbete) return ttPinHtml(TT_BLOCKED_VAGARBETE, 28, true);
+    return ttPinHtml(TT_BLOCKED_INCIDENT, 28, true);
   }
 
-  const src      = isOlycka ? TT_SIGN_A41 : TT_SIGN_A40;
-  const fallback = isOlycka ? '🚨' : '⚠️';
-  return `<img src="${src}" width="26" height="26" alt="${fallback}" style="display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6))">`;
+  const src = isOlycka ? TT_SIGN_A41 : TT_SIGN_A40;
+  return ttPinHtml(src, 26, false);
 }
 
-const TT_BLOCKED_VAGARBETE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii01MiAtNTIgMTA0IDEwNCI+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjUyIiBmaWxsPSIjZTAwIi8+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjM2IiBmaWxsPSIjZmZmIi8+CiAgPHBvbHlnb24gcG9pbnRzPSIwLC0zNiAzMS4yLDE4IC0zMS4yLDE4IiBmaWxsPSIjZmZmIiBzdHJva2U9IiNlMDAiIHN0cm9rZS13aWR0aD0iNC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHJlY3QgeD0iLTQiIHk9Ii0xNiIgd2lkdGg9IjUiIGhlaWdodD0iMTYiIHJ4PSIxIiBmaWxsPSIjMjIyIi8+CiAgPHJlY3QgeD0iLTEwIiB5PSItMiIgd2lkdGg9IjIwIiBoZWlnaHQ9IjEwIiByeD0iMiIgZmlsbD0iIzIyMiIvPgogIDxyZWN0IHg9Ii05IiB5PSI3IiB3aWR0aD0iNCIgaGVpZ2h0PSI1IiByeD0iMSIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9Ii0zIiB5PSI3IiB3aWR0aD0iNCIgaGVpZ2h0PSI1IiByeD0iMSIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9IjMiIHk9IjciIHdpZHRoPSI0IiBoZWlnaHQ9IjUiIHJ4PSIxIiBmaWxsPSIjZmZmIi8+Cjwvc3ZnPg==';
-const TT_BLOCKED_INCIDENT = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii01MiAtNTIgMTA0IDEwNCI+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjUyIiBmaWxsPSIjZTAwIi8+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjM2IiBmaWxsPSIjZmZmIi8+CiAgPHBvbHlnb24gcG9pbnRzPSIwLC0zNiAzMS4yLDE4IC0zMS4yLDE4IiBmaWxsPSIjZmZmIiBzdHJva2U9IiNlMDAiIHN0cm9rZS13aWR0aD0iNC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHJlY3QgeD0iLTMuNSIgeT0iLTE5IiB3aWR0aD0iNyIgaGVpZ2h0PSIyMiIgcng9IjMiIGZpbGw9IiMyMjIiLz4KICA8Y2lyY2xlIGN4PSIwIiBjeT0iMTMiIHI9IjQuNSIgZmlsbD0iIzIyMiIvPgo8L3N2Zz4=';
-const TT_BLOCKED_OLYCKA = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii01MiAtNTIgMTA0IDEwNCI+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjUyIiBmaWxsPSIjZTAwIi8+CiAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjM2IiBmaWxsPSIjZmZmIi8+CiAgPHBvbHlnb24gcG9pbnRzPSIwLC0zNiAzMS4yLDE4IC0zMS4yLDE4IiBmaWxsPSIjZmZmIiBzdHJva2U9IiNlMDAiIHN0cm9rZS13aWR0aD0iNC41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0LC0yKSI+CiAgICA8cmVjdCB4PSIwIiB5PSI0IiB3aWR0aD0iMTMiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiNlMDAiLz4KICAgIDxyZWN0IHg9IjIiIHk9IjAiIHdpZHRoPSI5IiBoZWlnaHQ9IjUiIHJ4PSIxIiBmaWxsPSIjZTAwIi8+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE0LC0yKSBzY2FsZSgtMSwxKSI+CiAgICA8cmVjdCB4PSIwIiB5PSI0IiB3aWR0aD0iMTMiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiNlMDAiLz4KICAgIDxyZWN0IHg9IjIiIHk9IjAiIHdpZHRoPSI5IiBoZWlnaHQ9IjUiIHJ4PSIxIiBmaWxsPSIjZTAwIi8+CiAgPC9nPgogIDxjaXJjbGUgY3g9IjAiIGN5PSI2IiByPSIzLjUiIGZpbGw9IiNlMDAiLz4KICA8bGluZSB4MT0iLTMiIHkxPSIyIiB4Mj0iLTciIHkyPSItNCIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSIwIiB5MT0iMSIgeDI9IjAiIHkyPSItNiIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSIzIiB5MT0iMiIgeDI9IjciIHkyPSItNCIgc3Ryb2tlPSIjZTAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4=';
+const TT_BLOCKED_VAGARBETE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9Jy01MiAtNTIgMTA0IDEwNCc+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzUyJyBmaWxsPScjZTAwJy8+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzM2JyBmaWxsPScjZmZmJy8+CiAgPHBvbHlnb24gcG9pbnRzPScwLC0zMCAyNiwxNSAtMjYsMTUnIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2UwMCcgc3Ryb2tlLXdpZHRoPSc0JyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+CiAgPHJlY3QgeD0nLTQnIHk9Jy0yMCcgd2lkdGg9JzgnIGhlaWdodD0nMjInIHJ4PScyJyBmaWxsPScjMWExYTFhJy8+CiAgPHJlY3QgeD0nLTEzJyB5PSctMScgd2lkdGg9JzI2JyBoZWlnaHQ9JzEyJyByeD0nMi41JyBmaWxsPScjMWExYTFhJy8+CiAgPHJlY3QgeD0nLTExJyB5PSc5JyB3aWR0aD0nNC41JyBoZWlnaHQ9JzYnIHJ4PScxJyBmaWxsPScjNzc3Jy8+CiAgPHJlY3QgeD0nLTMnIHk9JzknIHdpZHRoPSc0LjUnIGhlaWdodD0nNicgcng9JzEnIGZpbGw9JyM3NzcnLz4KICA8cmVjdCB4PSc1JyB5PSc5JyB3aWR0aD0nNC41JyBoZWlnaHQ9JzYnIHJ4PScxJyBmaWxsPScjNzc3Jy8+Cjwvc3ZnPg==';
+const TT_BLOCKED_INCIDENT = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9Jy01MiAtNTIgMTA0IDEwNCc+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzUyJyBmaWxsPScjZTAwJy8+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzM2JyBmaWxsPScjZmZmJy8+CiAgPHBvbHlnb24gcG9pbnRzPScwLC0zMCAyNiwxNSAtMjYsMTUnIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2UwMCcgc3Ryb2tlLXdpZHRoPSc0JyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+CiAgPHJlY3QgeD0nLTMuNScgeT0nLTE5JyB3aWR0aD0nNycgaGVpZ2h0PScyMCcgcng9JzIuNScgZmlsbD0nIzIyMicvPgogIDxjaXJjbGUgY3g9JzAnIGN5PScxMScgcj0nNCcgZmlsbD0nIzIyMicvPgo8L3N2Zz4=';
+const TT_BLOCKED_OLYCKA = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9Jy01MiAtNTIgMTA0IDEwNCc+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzUyJyBmaWxsPScjZTAwJy8+CiAgPGNpcmNsZSBjeD0nMCcgY3k9JzAnIHI9JzM2JyBmaWxsPScjZmZmJy8+CiAgPHBvbHlnb24gcG9pbnRzPScwLC0zMCAyNiwxNSAtMjYsMTUnIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2UwMCcgc3Ryb2tlLXdpZHRoPSc0JyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+CiAgPGcgdHJhbnNmb3JtPSd0cmFuc2xhdGUoLTEyLDIpIHJvdGF0ZSgtNDUpJz4KICAgIDxyZWN0IHg9Jy03JyB5PSctNCcgd2lkdGg9JzE0JyBoZWlnaHQ9JzcnIHJ4PScxLjUnIGZpbGw9JyNlMDAnLz4KICAgIDxyZWN0IHg9Jy00LjUnIHk9Jy03JyB3aWR0aD0nOScgaGVpZ2h0PSc1JyByeD0nMScgZmlsbD0nI2UwMCcvPgogICAgPHJlY3QgeD0nLTQnIHk9Jy02LjUnIHdpZHRoPSczJyBoZWlnaHQ9JzQnIHJ4PScwLjMnIGZpbGw9JyNiYmQnLz4KICAgIDxyZWN0IHg9JzEnIHk9Jy02LjUnIHdpZHRoPSczJyBoZWlnaHQ9JzQnIHJ4PScwLjMnIGZpbGw9JyNiYmQnLz4KICAgIDxjaXJjbGUgY3g9Jy0zLjUnIGN5PSc0JyByPScyLjUnIGZpbGw9JyMyMjInLz4KICAgIDxjaXJjbGUgY3g9JzMuNScgY3k9JzQnIHI9JzIuNScgZmlsbD0nIzIyMicvPgogIDwvZz4KICA8ZyB0cmFuc2Zvcm09J3RyYW5zbGF0ZSgxMiwyKSByb3RhdGUoNDUpJz4KICAgIDxyZWN0IHg9Jy03JyB5PSctNCcgd2lkdGg9JzE0JyBoZWlnaHQ9JzcnIHJ4PScxLjUnIGZpbGw9JyNlMDAnLz4KICAgIDxyZWN0IHg9Jy00LjUnIHk9Jy03JyB3aWR0aD0nOScgaGVpZ2h0PSc1JyByeD0nMScgZmlsbD0nI2UwMCcvPgogICAgPHJlY3QgeD0nLTQnIHk9Jy02LjUnIHdpZHRoPSczJyBoZWlnaHQ9JzQnIHJ4PScwLjMnIGZpbGw9JyNiYmQnLz4KICAgIDxyZWN0IHg9JzEnIHk9Jy02LjUnIHdpZHRoPSczJyBoZWlnaHQ9JzQnIHJ4PScwLjMnIGZpbGw9JyNiYmQnLz4KICAgIDxjaXJjbGUgY3g9Jy0zLjUnIGN5PSc0JyByPScyLjUnIGZpbGw9JyMyMjInLz4KICAgIDxjaXJjbGUgY3g9JzMuNScgY3k9JzQnIHI9JzIuNScgZmlsbD0nIzIyMicvPgogIDwvZz4KICA8bGluZSB4MT0nLTInIHkxPSctNScgeDI9Jy01JyB5Mj0nLTEwJyBzdHJva2U9JyNlMDAnIHN0cm9rZS13aWR0aD0nMS44JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz4KICA8bGluZSB4MT0nMCcgeTE9Jy02JyB4Mj0nMCcgeTI9Jy0xMScgc3Ryb2tlPScjZTAwJyBzdHJva2Utd2lkdGg9JzEuOCcgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+CiAgPGxpbmUgeDE9JzInIHkxPSctNScgeDI9JzUnIHkyPSctMTAnIHN0cm9rZT0nI2UwMCcgc3Ryb2tlLXdpZHRoPScxLjgnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcvPgo8L3N2Zz4=';
 
 function ttBlockedIcon(type) {
-  const src = type === 'olycka' ? TT_BLOCKED_OLYCKA
+  const src = type === 'olycka'    ? TT_BLOCKED_OLYCKA
             : type === 'vagarbete' ? TT_BLOCKED_VAGARBETE
             : TT_BLOCKED_INCIDENT;
-  const alt = type === 'olycka' ? 'Olycka – väg avstängd'
-            : type === 'vagarbete' ? 'Vägarbete – väg avstängd'
-            : 'Incident – väg avstängd';
-  return `<img src="${src}" width="28" height="28" alt="${alt}" style="display:block;filter:drop-shadow(0 1px 4px rgba(0,0,0,0.5))">`;
+  return ttPinHtml(src, 28, true);
 }
 
-// ── Vägarbete-ikon: orange triangel med grävskovel ─────────────────
-const TT_SIGN_VAGARBETE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8IS0tIE9yYW5nZSB2YXJuaW5nc3RyaWFuZ2VsIC0tPgogIDxwb2x5Z29uIHBvaW50cz0iNTAsNiA5Nyw5NCAzLDk0IiBmaWxsPSIjZmY4YzAwIiBzdHJva2U9IiNjYzY2MDAiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwhLS0gR3LDpHZza292ZWw6IHNrYWZ0IC0tPgogIDxyZWN0IHg9IjQ3IiB5PSIyOCIgd2lkdGg9IjYiIGhlaWdodD0iMzAiIHJ4PSIyIiBmaWxsPSIjMWExYTFhIi8+CiAgPCEtLSBTa292ZWxuOiBrcm9wcCAtLT4KICA8cmVjdCB4PSIzNiIgeT0iNTUiIHdpZHRoPSIyOCIgaGVpZ2h0PSIxNiIgcng9IjMiIGZpbGw9IiMxYTFhMWEiLz4KICA8IS0tIFNrb3ZlbG46IHRhbmQgdsOkbnN0ZXIgLS0+CiAgPHJlY3QgeD0iMzgiIHk9IjY4IiB3aWR0aD0iNSIgaGVpZ2h0PSI4IiByeD0iMSIgZmlsbD0iIzFhMWExYSIvPgogIDwhLS0gU2tvdmVsbjogdGFuZCBtaXR0ZW4gLS0+CiAgPHJlY3QgeD0iNDciIHk9IjY4IiB3aWR0aD0iNSIgaGVpZ2h0PSI4IiByeD0iMSIgZmlsbD0iIzFhMWExYSIvPgogIDwhLS0gU2tvdmVsbjogdGFuZCBow7ZnZXIgLS0+CiAgPHJlY3QgeD0iNTYiIHk9IjY4IiB3aWR0aD0iNSIgaGVpZ2h0PSI4IiByeD0iMSIgZmlsbD0iIzFhMWExYSIvPgo8L3N2Zz4=';
+const TT_SIGN_VAGARBETE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz4KICA8cG9seWdvbiBwb2ludHM9JzUwLDYgOTcsOTQgMyw5NCcgZmlsbD0nI2ZmZicgc3Ryb2tlPScjZTAwJyBzdHJva2Utd2lkdGg9JzcnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz4KICA8cmVjdCB4PSc0NicgeT0nMzInIHdpZHRoPSc4JyBoZWlnaHQ9JzI2JyByeD0nMicgZmlsbD0nIzFhMWExYScvPgogIDxyZWN0IHg9JzM0JyB5PSc1NScgd2lkdGg9JzMyJyBoZWlnaHQ9JzE0JyByeD0nMycgZmlsbD0nIzFhMWExYScvPgogIDxyZWN0IHg9JzM2JyB5PSc2Nycgd2lkdGg9JzUnIGhlaWdodD0nNycgcng9JzEnIGZpbGw9JyM1NTUnLz4KICA8cmVjdCB4PSc0NCcgeT0nNjcnIHdpZHRoPSc1JyBoZWlnaHQ9JzcnIHJ4PScxJyBmaWxsPScjNTU1Jy8+CiAgPHJlY3QgeD0nNTInIHk9JzY3JyB3aWR0aD0nNScgaGVpZ2h0PSc3JyByeD0nMScgZmlsbD0nIzU1NScvPgo8L3N2Zz4=';
 
 function ttVagarbeteIcon() {
-  return `<img src="${TT_SIGN_VAGARBETE}" width="26" height="26" alt="🚧" style="display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6))">`;
+  return ttPinHtml(TT_SIGN_VAGARBETE, 26, false);
+}
+
+function ttPinHtml(src, size, blocked) {
+  if (blocked) {
+    return `<img src="${src}" width="${size}" height="${size}" class="tt-pin-sign" alt=""><div class="tt-pin-stem"></div>`;
+  }
+  return `<div class="tt-pin-stem"></div><img src="${src}" width="${size}" height="${size}" class="tt-pin-sign" alt="">`;
 }
 
 const TT_SEG_LEGEND = '';
@@ -6442,22 +6437,16 @@ function ttRenderUpstreamDelay(routeId, segments, delayRowEl) {
   // Samla incident-positioner för konfliktskydd
   const incidentPcts = ttMatchIncidents(routeId).map(inc => inc.pct);
 
+  // Kandidatlista: { pct, delayMin }
+  const candidates = [];
+
   // ── 1. Händelsebaserade fördröjningar ──
   for (const inc of ttMatchIncidents(routeId)) {
     const delayMin = ttCalcUpstreamDelay(inc.pct, segments);
-    if (delayMin > 0) {
-      const delayEl = document.createElement('div');
-      delayEl.className = 'tt-upstream-delay';
-      delayEl.style.left = inc.pct.toFixed(2) + '%';
-      delayEl.style.transform = 'translateX(calc(-100% - 14px))';
-      delayEl.textContent = '+' + delayMin + ' min';
-      el.appendChild(delayEl);
-    }
+    if (delayMin > 0) candidates.push({ pct: inc.pct, delayMin });
   }
 
   // ── 2. Spontana köer – röda segment utan kopplad händelse ──
-  // Scanna från höger till vänster. Varje gång vi hittar ett rött segment
-  // som inte täcks av en händelse (inom ±10 pct) startar vi en beräkning.
   const INCIDENT_GUARD = CONFIG.ttIncidentGuardPct;
 
   let i = segsWithPct.length - 1;
@@ -6467,24 +6456,15 @@ function ttRenderUpstreamDelay(routeId, segments, delayRowEl) {
     const typ = seg.typicalSpeed;
     const ratio = cur && typ ? cur / typ : 1;
 
-    // Hoppa över fria/ok segment – fånga gul+röd (ratio < 0.7 = tt-seg-slow eller tt-seg-bad)
     if (ratio >= 0.7) { i--; continue; }
 
-    // Kolla om detta röda segment täcks av en händelse
     const triggerPct = seg.endPct;
     const coveredByIncident = incidentPcts.some(p => Math.abs(p - triggerPct) <= INCIDENT_GUARD);
     if (coveredByIncident) { i--; continue; }
 
     // Beräkna fördröjning från höger kant av detta röda segment
     const delayMin = ttCalcUpstreamDelay(triggerPct, segments);
-    if (delayMin > 0) {
-      const delayEl = document.createElement('div');
-      delayEl.className = 'tt-upstream-delay';
-      delayEl.style.left = triggerPct.toFixed(2) + '%';
-      delayEl.style.transform = 'translateX(calc(-100% - 14px))';
-      delayEl.textContent = '+' + delayMin + ' min';
-      el.appendChild(delayEl);
-    }
+    if (delayMin > 0) candidates.push({ pct: triggerPct, delayMin });
 
     // Hoppa förbi hela köblocket (tills två gröna i följd) så vi inte
     // skapar duplicerade etiketter för samma kö
@@ -6500,6 +6480,33 @@ function ttRenderUpstreamDelay(routeId, segments, delayRowEl) {
       }
       i--;
     }
+  }
+
+  if (!candidates.length) return;
+
+  // ── 3. Gruppera kandidater inom 8 pct av varandra, summera ──
+  const GROUP_THRESHOLD = 8;
+  candidates.sort((a, b) => a.pct - b.pct);
+  const groups = [];
+  for (const c of candidates) {
+    const last = groups[groups.length - 1];
+    if (last && (c.pct - last.pct) <= GROUP_THRESHOLD) {
+      last.totalDelay += c.delayMin;
+      last.pctSum     += c.pct;
+      last.count      += 1;
+    } else {
+      groups.push({ pct: c.pct, pctSum: c.pct, totalDelay: c.delayMin, count: 1 });
+    }
+  }
+
+  // ── 4. Rendera en etikett per grupp, centrerad på gruppens medelposition ──
+  for (const g of groups) {
+    const centerPct = g.pctSum / g.count;
+    const delayEl = document.createElement('div');
+    delayEl.className = 'tt-upstream-delay';
+    delayEl.style.left = centerPct.toFixed(2) + '%';
+    delayEl.textContent = '+' + g.totalDelay + ' min';
+    el.appendChild(delayEl);
   }
 }
 
