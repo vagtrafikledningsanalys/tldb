@@ -6366,9 +6366,6 @@ function ttVagarbeteIcon() {
 }
 
 function ttPinHtml(src, size, blocked) {
-  if (blocked) {
-    return `<div class="tt-pin-stem"></div><img src="${src}" width="${size}" height="${size}" class="tt-pin-sign" alt="">`;
-  }
   return `<img src="${src}" width="${size}" height="${size}" class="tt-pin-sign" alt=""><div class="tt-pin-stem"></div>`;
 }
 
